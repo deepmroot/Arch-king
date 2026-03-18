@@ -11,6 +11,9 @@
 [sub_resource type="RectangleShape2D" id="1"]
 size = Vector2(140, 56)
 
+[sub_resource type="RectangleShape2D" id="2"]
+size = Vector2(96, 44)
+
 [node name="Level" type="Node2D" unique_id=1341620308]
 script = ExtResource("1")
 
@@ -53,8 +56,16 @@ texture = ExtResource("6")
 position = Vector2(1080, 400)
 texture = ExtResource("6")
 
+[node name="SupportArea" type="Polygon2D" parent="." unique_id=170000001]
+color = Color(0.52549, 0.431373, 0.247059, 0.9)
+polygon = PackedVector2Array(0, 540, 1152, 540, 1152, 900, 0, 900)
+
+[node name="BackYardBoundary" type="Polygon2D" parent="." unique_id=170000039]
+color = Color(0.360784, 0.333333, 0.27451, 1)
+polygon = PackedVector2Array(0, 840, 1152, 840, 1152, 900, 0, 900)
+
 [node name="ShopStall" type="Sprite2D" parent="." unique_id=349191951]
-position = Vector2(952, 576)
+position = Vector2(160, 725)
 scale = Vector2(0.6, 0.6)
 texture = ExtResource("7")
 region_enabled = true
@@ -62,20 +73,182 @@ region_rect = Rect2(0, 432, 272, 288)
 
 [node name="CastleWallBand" type="Polygon2D" parent="." unique_id=2017152891]
 color = Color(0.388235, 0.352941, 0.294118, 1)
-polygon = PackedVector2Array(0, 536, 1152, 536, 1152, 592, 0, 592)
+polygon = PackedVector2Array(0, 470, 1152, 470, 1152, 540, 0, 540)
+
+[node name="WallBattlements" type="Node2D" parent="." unique_id=170000002]
+
+[node name="Battlement1" type="Polygon2D" parent="WallBattlements" unique_id=170000003]
+color = Color(0.690196, 0.631373, 0.505882, 1)
+polygon = PackedVector2Array(0, 450, 58, 450, 58, 470, 0, 470)
+
+[node name="Battlement2" type="Polygon2D" parent="WallBattlements" unique_id=170000004]
+color = Color(0.690196, 0.631373, 0.505882, 1)
+polygon = PackedVector2Array(78, 450, 136, 450, 136, 470, 78, 470)
+
+[node name="Battlement3" type="Polygon2D" parent="WallBattlements" unique_id=170000005]
+color = Color(0.690196, 0.631373, 0.505882, 1)
+polygon = PackedVector2Array(156, 450, 214, 450, 214, 470, 156, 470)
+
+[node name="Battlement4" type="Polygon2D" parent="WallBattlements" unique_id=170000006]
+color = Color(0.690196, 0.631373, 0.505882, 1)
+polygon = PackedVector2Array(234, 450, 292, 450, 292, 470, 234, 470)
+
+[node name="Battlement5" type="Polygon2D" parent="WallBattlements" unique_id=170000007]
+color = Color(0.690196, 0.631373, 0.505882, 1)
+polygon = PackedVector2Array(312, 450, 370, 450, 370, 470, 312, 470)
+
+[node name="Battlement6" type="Polygon2D" parent="WallBattlements" unique_id=170000008]
+color = Color(0.690196, 0.631373, 0.505882, 1)
+polygon = PackedVector2Array(390, 450, 448, 450, 448, 470, 390, 470)
+
+[node name="Battlement7" type="Polygon2D" parent="WallBattlements" unique_id=170000009]
+color = Color(0.690196, 0.631373, 0.505882, 1)
+polygon = PackedVector2Array(468, 450, 526, 450, 526, 470, 468, 470)
+
+[node name="Battlement8" type="Polygon2D" parent="WallBattlements" unique_id=170000010]
+color = Color(0.690196, 0.631373, 0.505882, 1)
+polygon = PackedVector2Array(626, 450, 684, 450, 684, 470, 626, 470)
+
+[node name="Battlement9" type="Polygon2D" parent="WallBattlements" unique_id=170000011]
+color = Color(0.690196, 0.631373, 0.505882, 1)
+polygon = PackedVector2Array(704, 450, 762, 450, 762, 470, 704, 470)
+
+[node name="Battlement10" type="Polygon2D" parent="WallBattlements" unique_id=170000012]
+color = Color(0.690196, 0.631373, 0.505882, 1)
+polygon = PackedVector2Array(782, 450, 840, 450, 840, 470, 782, 470)
+
+[node name="Battlement11" type="Polygon2D" parent="WallBattlements" unique_id=170000013]
+color = Color(0.690196, 0.631373, 0.505882, 1)
+polygon = PackedVector2Array(860, 450, 918, 450, 918, 470, 860, 470)
+
+[node name="Battlement12" type="Polygon2D" parent="WallBattlements" unique_id=170000014]
+color = Color(0.690196, 0.631373, 0.505882, 1)
+polygon = PackedVector2Array(938, 450, 996, 450, 996, 470, 938, 470)
+
+[node name="Battlement13" type="Polygon2D" parent="WallBattlements" unique_id=170000015]
+color = Color(0.690196, 0.631373, 0.505882, 1)
+polygon = PackedVector2Array(1016, 450, 1074, 450, 1074, 470, 1016, 470)
+
+[node name="Battlement14" type="Polygon2D" parent="WallBattlements" unique_id=170000016]
+color = Color(0.690196, 0.631373, 0.505882, 1)
+polygon = PackedVector2Array(1094, 450, 1152, 450, 1152, 470, 1094, 470)
 
 [node name="Towers" type="Node2D" parent="." unique_id=2039546330]
 
 [node name="LeftTower" type="Polygon2D" parent="Towers" unique_id=1907434387]
 color = Color(0.294118, 0.262745, 0.219608, 1)
-polygon = PackedVector2Array(0, 300, 150, 300, 150, 648, 0, 648)
+polygon = PackedVector2Array(0, 180, 170, 180, 170, 900, 0, 900)
 
 [node name="RightTower" type="Polygon2D" parent="Towers" unique_id=849631633]
 color = Color(0.294118, 0.262745, 0.219608, 1)
-polygon = PackedVector2Array(1002, 300, 1152, 300, 1152, 648, 1002, 648)
+polygon = PackedVector2Array(982, 180, 1152, 180, 1152, 900, 982, 900)
+
+[node name="LeftTowerCap" type="Polygon2D" parent="Towers" unique_id=170000017]
+color = Color(0.713726, 0.658824, 0.552941, 1)
+polygon = PackedVector2Array(0, 160, 170, 160, 170, 210, 0, 210)
+
+[node name="RightTowerCap" type="Polygon2D" parent="Towers" unique_id=170000018]
+color = Color(0.713726, 0.658824, 0.552941, 1)
+polygon = PackedVector2Array(982, 160, 1152, 160, 1152, 210, 982, 210)
+
+[node name="Ladder" type="Node2D" parent="." unique_id=170000019]
+position = Vector2(576, 625)
+
+[node name="LeftRail" type="Line2D" parent="Ladder" unique_id=170000020]
+width = 5.0
+points = PackedVector2Array(-22, -95, -22, 95)
+default_color = Color(0.352941, 0.219608, 0.0941176, 1)
+
+[node name="RightRail" type="Line2D" parent="Ladder" unique_id=170000021]
+width = 5.0
+points = PackedVector2Array(22, -95, 22, 95)
+default_color = Color(0.352941, 0.219608, 0.0941176, 1)
+
+[node name="Rung1" type="Line2D" parent="Ladder" unique_id=170000022]
+width = 4.0
+points = PackedVector2Array(-20, -76, 20, -76)
+default_color = Color(0.533333, 0.345098, 0.164706, 1)
+
+[node name="Rung2" type="Line2D" parent="Ladder" unique_id=170000023]
+width = 4.0
+points = PackedVector2Array(-20, -48, 20, -48)
+default_color = Color(0.533333, 0.345098, 0.164706, 1)
+
+[node name="Rung3" type="Line2D" parent="Ladder" unique_id=170000024]
+width = 4.0
+points = PackedVector2Array(-20, -20, 20, -20)
+default_color = Color(0.533333, 0.345098, 0.164706, 1)
+
+[node name="Rung4" type="Line2D" parent="Ladder" unique_id=170000025]
+width = 4.0
+points = PackedVector2Array(-20, 8, 20, 8)
+default_color = Color(0.533333, 0.345098, 0.164706, 1)
+
+[node name="Rung5" type="Line2D" parent="Ladder" unique_id=170000026]
+width = 4.0
+points = PackedVector2Array(-20, 36, 20, 36)
+default_color = Color(0.533333, 0.345098, 0.164706, 1)
+
+[node name="Rung6" type="Line2D" parent="Ladder" unique_id=170000040]
+width = 4.0
+points = PackedVector2Array(-20, 64, 20, 64)
+default_color = Color(0.533333, 0.345098, 0.164706, 1)
+
+[node name="TrapSlots" type="Node2D" parent="." unique_id=170000027]
+
+[node name="TrapSlot1" type="Polygon2D" parent="TrapSlots" unique_id=170000028]
+color = Color(0.45, 0.45, 0.45, 0.65)
+polygon = PackedVector2Array(735, 730, 785, 730, 805, 750, 715, 750)
+
+[node name="TrapSlot2" type="Polygon2D" parent="TrapSlots" unique_id=170000029]
+color = Color(0.45, 0.45, 0.45, 0.65)
+polygon = PackedVector2Array(845, 710, 895, 710, 915, 730, 825, 730)
+
+[node name="TrapSlot3" type="Polygon2D" parent="TrapSlots" unique_id=170000030]
+color = Color(0.45, 0.45, 0.45, 0.65)
+polygon = PackedVector2Array(930, 760, 980, 760, 1000, 780, 910, 780)
+
+[node name="LadderZones" type="Node2D" parent="." unique_id=170000034]
+
+[node name="LadderTopZone" type="Area2D" parent="LadderZones" unique_id=170000035]
+position = Vector2(576, 446)
+collision_mask = 1
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="LadderZones/LadderTopZone" unique_id=170000036]
+shape = SubResource("2")
+
+[node name="LadderBottomZone" type="Area2D" parent="LadderZones" unique_id=170000037]
+position = Vector2(576, 720)
+collision_mask = 1
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="LadderZones/LadderBottomZone" unique_id=170000038]
+shape = SubResource("2")
+
+[node name="LayoutMarkers" type="Node2D" parent="." unique_id=170000031]
+
+[node name="EnemyLaneCenter" type="Marker2D" parent="LayoutMarkers" unique_id=170000032]
+position = Vector2(576, 0)
+
+[node name="ShopMarker" type="Marker2D" parent="LayoutMarkers" unique_id=170000033]
+position = Vector2(165, 700)
+
+[node name="WallCameraFocus" type="Marker2D" parent="LayoutMarkers" unique_id=170000041]
+position = Vector2(576, 324)
+
+[node name="BackAreaCameraFocus" type="Marker2D" parent="LayoutMarkers" unique_id=170000042]
+position = Vector2(576, 700)
 
 [node name="Player" parent="." unique_id=906796356 instance=ExtResource("2")]
 process_mode = 1
+
+[node name="GameCamera" type="Camera2D" parent="." unique_id=170000043]
+position = Vector2(576, 324)
+enabled = true
+position_smoothing_enabled = false
+limit_left = 0
+limit_top = 0
+limit_right = 1152
+limit_bottom = 900
 
 [node name="Enemies" type="Node2D" parent="." unique_id=1773861448]
 process_mode = 1

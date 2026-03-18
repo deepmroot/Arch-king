@@ -16,6 +16,11 @@ var fire_timer := 0.0
 var is_attacking := false
 var is_dead := false
 var facing_direction := 1.0
+var current_lane_y := 0.0
+var movement_locked := false
+var free_move_mode := false
+var lower_bound_y := 0.0
+var upper_bound_y := 0.0
 
 @onready var shoot_point: Marker2D = $ShootPoint
 @onready var animated_sprite: AnimatedSprite2D = $AnimatedSprite2D
@@ -24,7 +29,8 @@ var facing_direction := 1.0
 
 func _ready() -> void:
 	_ensure_local_input_actions()
-	global_position.y = wall_y
+	current_lane_y = wall_y
+	global_position.y = current_lane_y
 	_build_animations()
 	animated_sprite.play("idle")
 	animated_sprite.animation_finished.connect(_on_animation_finished)
@@ -37,19 +43,34 @@ func _physics_process(delta: float) -> void:
 	if fire_timer > 0.0:
 		fire_timer -= delta
 
-	var direction := _get_move_direction()
-	_update_facing(direction)
-	velocity = Vector2(direction * speed, 0.0)
+	if movement_locked:
+		velocity = Vector2.ZERO
+		if not is_attacking and animated_sprite.animation != "idle":
+			animated_sprite.play("idle")
+		return
+
+	var move_input := _get_move_input()
+	if abs(move_input.x) > 0.01:
+		_update_facing(move_input.x)
+
+	if free_move_mode:
+		velocity = move_input * speed
+	else:
+		velocity = Vector2(move_input.x * speed, 0.0)
+
 	move_and_slide()
 
 	global_position.x = clamp(global_position.x, left_bound, right_bound)
-	global_position.y = wall_y
+	if free_move_mode:
+		global_position.y = clamp(global_position.y, upper_bound_y, lower_bound_y)
+	else:
+		global_position.y = current_lane_y
 
 	if _is_shoot_just_pressed():
 		shoot()
 
 	if not is_attacking:
-		_update_movement_animation(direction)
+		_update_movement_animation(move_input)
 
 
 func shoot() -> void:
@@ -73,16 +94,41 @@ func die() -> void:
 	animated_sprite.play("death")
 
 
+func set_lane(target_y: float, target_left_bound: float, target_right_bound: float) -> void:
+	free_move_mode = false
+	current_lane_y = target_y
+	left_bound = target_left_bound
+	right_bound = target_right_bound
+	global_position.x = clamp(global_position.x, left_bound, right_bound)
+	global_position.y = current_lane_y
+
+
+func set_free_move_bounds(target_left_bound: float, target_right_bound: float, target_upper_bound_y: float, target_lower_bound_y: float) -> void:
+	free_move_mode = true
+	left_bound = target_left_bound
+	right_bound = target_right_bound
+	upper_bound_y = target_upper_bound_y
+	lower_bound_y = target_lower_bound_y
+	global_position.x = clamp(global_position.x, left_bound, right_bound)
+	global_position.y = clamp(global_position.y, upper_bound_y, lower_bound_y)
+
+
+func set_movement_locked(locked: bool) -> void:
+	movement_locked = locked
+	if locked:
+		velocity = Vector2.ZERO
+
+
 func _on_animation_finished() -> void:
 	if animated_sprite.animation == "attack":
 		is_attacking = false
-		var direction := _get_move_direction()
-		_update_facing(direction)
-		_update_movement_animation(direction)
+		var move_input := _get_move_input()
+		_update_facing(move_input.x)
+		_update_movement_animation(move_input)
 
 
-func _update_movement_animation(direction: float) -> void:
-	if abs(direction) > 0.01:
+func _update_movement_animation(move_input: Vector2) -> void:
+	if move_input.length() > 0.01:
 		if animated_sprite.animation != "run":
 			animated_sprite.play("run")
 	else:
@@ -114,6 +160,8 @@ func _build_animations() -> void:
 func _ensure_local_input_actions() -> void:
 	_ensure_key_action("move_left", [KEY_A, KEY_LEFT])
 	_ensure_key_action("move_right", [KEY_D, KEY_RIGHT])
+	_ensure_key_action("move_up", [KEY_W, KEY_UP])
+	_ensure_key_action("move_down", [KEY_S, KEY_DOWN])
 	_ensure_key_action("shoot", [KEY_SPACE])
 	_ensure_mouse_action("shoot", MOUSE_BUTTON_LEFT)
 
@@ -140,10 +188,12 @@ func _ensure_mouse_action(action_name: String, button: MouseButton) -> void:
 		InputMap.action_add_event(action_name, mouse_event)
 
 
-func _get_move_direction() -> float:
+func _get_move_input() -> Vector2:
 	var right_action := "move_right" if InputMap.has_action("move_right") else "ui_right"
 	var left_action := "move_left" if InputMap.has_action("move_left") else "ui_left"
-	return Input.get_action_strength(right_action) - Input.get_action_strength(left_action)
+	var down_action := "move_down" if InputMap.has_action("move_down") else "ui_down"
+	var up_action := "move_up" if InputMap.has_action("move_up") else "ui_up"
+	return Input.get_vector(left_action, right_action, up_action, down_action)
 
 
 func _is_shoot_just_pressed() -> bool:
