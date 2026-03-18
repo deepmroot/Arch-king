@@ -7,12 +7,19 @@
 [ext_resource type="Texture2D" uid="uid://g024wlm17nhy" path="res://assets/environment/fantasy_tileset/picks/panel_tile.png" id="5"]
 [ext_resource type="Texture2D" uid="uid://h65uagph5b5b" path="res://assets/environment/fantasy_tileset/The Fan-tasy Tileset (Free)/Art/Trees and Bushes/Tree_Emerald_1.png" id="6"]
 [ext_resource type="Texture2D" uid="uid://b5f5l4aowm0nx" path="res://assets/environment/fantasy_tileset/The Fan-tasy Tileset (Free)/Art/Buildings/Atlas/Buildings.png" id="7"]
-
-[sub_resource type="RectangleShape2D" id="1"]
-size = Vector2(140, 56)
+[ext_resource type="Texture2D" uid="uid://dpitrllub0ivo" path="res://assets/environment/fantasy_tileset/The Fan-tasy Tileset (Free)/Art/Buildings/CityWall_Gate_1.png" id="8"]
+[ext_resource type="Texture2D" uid="uid://ciwbnmm5k36to" path="res://assets/environment/fantasy_tileset/The Fan-tasy Tileset (Free)/Art/Props/Crate_Medium_Closed.png" id="9"]
+[ext_resource type="Texture2D" uid="uid://c2x5ihbha2gjd" path="res://assets/environment/fantasy_tileset/The Fan-tasy Tileset (Free)/Art/Props/Barrel_Small_Empty.png" id="10"]
+[ext_resource type="Texture2D" uid="uid://vrvuesaiammb" path="res://assets/environment/fantasy_tileset/The Fan-tasy Tileset (Free)/Art/Trees and Bushes/Bush_Emerald_4.png" id="11"]
+[ext_resource type="Texture2D" uid="uid://d4br8u0vb45vy" path="res://assets/environment/fantasy_tileset/The Fan-tasy Tileset (Free)/Art/Props/LampPost_3.png" id="12"]
+[ext_resource type="Texture2D" uid="uid://4o1wpanfr1pl" path="res://assets/environment/fantasy_tileset/The Fan-tasy Tileset (Free)/Art/Props/Sack_3.png" id="13"]
+[ext_resource type="Texture2D" uid="uid://dleixg85wibrv" path="res://assets/environment/fantasy_tileset/The Fan-tasy Tileset (Free)/Art/Trees and Bushes/Tree_Emerald_3.png" id="14"]
 
 [sub_resource type="RectangleShape2D" id="2"]
 size = Vector2(96, 44)
+
+[sub_resource type="RectangleShape2D" id="1"]
+size = Vector2(140, 56)
 
 [node name="Level" type="Node2D" unique_id=1341620308]
 script = ExtResource("1")
@@ -56,6 +63,34 @@ texture = ExtResource("6")
 position = Vector2(1080, 400)
 texture = ExtResource("6")
 
+[node name="Tree6" type="Sprite2D" parent="Background/Decorations" unique_id=170000050]
+position = Vector2(1030, 580)
+texture = ExtResource("14")
+
+[node name="Tree7" type="Sprite2D" parent="Background/Decorations" unique_id=170000051]
+position = Vector2(140, 610)
+texture = ExtResource("14")
+
+[node name="Bush1" type="Sprite2D" parent="Background/Decorations" unique_id=170000052]
+position = Vector2(355, 355)
+scale = Vector2(1.4, 1.4)
+texture = ExtResource("11")
+
+[node name="Bush2" type="Sprite2D" parent="Background/Decorations" unique_id=170000053]
+position = Vector2(780, 335)
+scale = Vector2(1.4, 1.4)
+texture = ExtResource("11")
+
+[node name="Bush3" type="Sprite2D" parent="Background/Decorations" unique_id=170000054]
+position = Vector2(318, 520)
+scale = Vector2(1.3, 1.3)
+texture = ExtResource("11")
+
+[node name="Bush4" type="Sprite2D" parent="Background/Decorations" unique_id=170000055]
+position = Vector2(840, 520)
+scale = Vector2(1.3, 1.3)
+texture = ExtResource("11")
+
 [node name="SupportArea" type="Polygon2D" parent="." unique_id=170000001]
 color = Color(0.52549, 0.431373, 0.247059, 0.9)
 polygon = PackedVector2Array(0, 540, 1152, 540, 1152, 900, 0, 900)
@@ -64,6 +99,15 @@ polygon = PackedVector2Array(0, 540, 1152, 540, 1152, 900, 0, 900)
 color = Color(0.360784, 0.333333, 0.27451, 1)
 polygon = PackedVector2Array(0, 840, 1152, 840, 1152, 900, 0, 900)
 
+[node name="WallFrontShadow" type="Polygon2D" parent="." unique_id=170000056]
+color = Color(0, 0, 0, 0.18)
+polygon = PackedVector2Array(0, 540, 1152, 540, 1152, 566, 0, 566)
+
+[node name="GateArch" type="Sprite2D" parent="." unique_id=170000057]
+position = Vector2(576, 538)
+scale = Vector2(2, 2)
+texture = ExtResource("8")
+
 [node name="ShopStall" type="Sprite2D" parent="." unique_id=349191951]
 position = Vector2(160, 725)
 scale = Vector2(0.6, 0.6)
@@ -71,9 +115,33 @@ texture = ExtResource("7")
 region_enabled = true
 region_rect = Rect2(0, 432, 272, 288)
 
+[node name="LampLeft" type="Sprite2D" parent="." unique_id=170000058]
+position = Vector2(255, 720)
+texture = ExtResource("12")
+
+[node name="ShopCrate" type="Sprite2D" parent="." unique_id=170000059]
+position = Vector2(252, 785)
+texture = ExtResource("9")
+
+[node name="ShopBarrel" type="Sprite2D" parent="." unique_id=170000060]
+position = Vector2(286, 790)
+texture = ExtResource("10")
+
+[node name="ShopSack" type="Sprite2D" parent="." unique_id=170000061]
+position = Vector2(215, 786)
+texture = ExtResource("13")
+
 [node name="CastleWallBand" type="Polygon2D" parent="." unique_id=2017152891]
 color = Color(0.388235, 0.352941, 0.294118, 1)
 polygon = PackedVector2Array(0, 470, 1152, 470, 1152, 540, 0, 540)
+
+[node name="WallHighlight" type="Polygon2D" parent="." unique_id=170000066]
+color = Color(0.584314, 0.529412, 0.423529, 0.45)
+polygon = PackedVector2Array(0, 470, 1152, 470, 1152, 490, 0, 490)
+
+[node name="WallMidShadow" type="Polygon2D" parent="." unique_id=170000067]
+color = Color(0, 0, 0, 0.12)
+polygon = PackedVector2Array(0, 500, 1152, 500, 1152, 520, 0, 520)
 
 [node name="WallBattlements" type="Node2D" parent="." unique_id=170000002]
 
@@ -151,47 +219,71 @@ polygon = PackedVector2Array(0, 160, 170, 160, 170, 210, 0, 210)
 color = Color(0.713726, 0.658824, 0.552941, 1)
 polygon = PackedVector2Array(982, 160, 1152, 160, 1152, 210, 982, 210)
 
+[node name="LeftTowerHighlight" type="Polygon2D" parent="Towers" unique_id=170000068]
+color = Color(0.658824, 0.596078, 0.490196, 0.26)
+polygon = PackedVector2Array(18, 190, 62, 190, 62, 900, 18, 900)
+
+[node name="RightTowerHighlight" type="Polygon2D" parent="Towers" unique_id=170000069]
+color = Color(0.658824, 0.596078, 0.490196, 0.26)
+polygon = PackedVector2Array(1000, 190, 1044, 190, 1044, 900, 1000, 900)
+
+[node name="LeftTowerWindow" type="Polygon2D" parent="Towers" unique_id=170000070]
+color = Color(0.180392, 0.14902, 0.117647, 1)
+polygon = PackedVector2Array(44, 620, 84, 620, 84, 698, 44, 698)
+
+[node name="RightTowerWindow" type="Polygon2D" parent="Towers" unique_id=170000071]
+color = Color(0.180392, 0.14902, 0.117647, 1)
+polygon = PackedVector2Array(1068, 620, 1108, 620, 1108, 698, 1068, 698)
+
+[node name="LeftTowerWindowGlow" type="Polygon2D" parent="Towers" unique_id=170000072]
+color = Color(0.980392, 0.572549, 0.192157, 0.28)
+polygon = PackedVector2Array(50, 632, 78, 632, 78, 686, 50, 686)
+
+[node name="RightTowerWindowGlow" type="Polygon2D" parent="Towers" unique_id=170000073]
+color = Color(0.980392, 0.572549, 0.192157, 0.28)
+polygon = PackedVector2Array(1074, 632, 1102, 632, 1102, 686, 1074, 686)
+
 [node name="Ladder" type="Node2D" parent="." unique_id=170000019]
 position = Vector2(576, 625)
 
 [node name="LeftRail" type="Line2D" parent="Ladder" unique_id=170000020]
-width = 5.0
 points = PackedVector2Array(-22, -95, -22, 95)
+width = 5.0
 default_color = Color(0.352941, 0.219608, 0.0941176, 1)
 
 [node name="RightRail" type="Line2D" parent="Ladder" unique_id=170000021]
-width = 5.0
 points = PackedVector2Array(22, -95, 22, 95)
+width = 5.0
 default_color = Color(0.352941, 0.219608, 0.0941176, 1)
 
 [node name="Rung1" type="Line2D" parent="Ladder" unique_id=170000022]
-width = 4.0
 points = PackedVector2Array(-20, -76, 20, -76)
+width = 4.0
 default_color = Color(0.533333, 0.345098, 0.164706, 1)
 
 [node name="Rung2" type="Line2D" parent="Ladder" unique_id=170000023]
-width = 4.0
 points = PackedVector2Array(-20, -48, 20, -48)
+width = 4.0
 default_color = Color(0.533333, 0.345098, 0.164706, 1)
 
 [node name="Rung3" type="Line2D" parent="Ladder" unique_id=170000024]
-width = 4.0
 points = PackedVector2Array(-20, -20, 20, -20)
+width = 4.0
 default_color = Color(0.533333, 0.345098, 0.164706, 1)
 
 [node name="Rung4" type="Line2D" parent="Ladder" unique_id=170000025]
-width = 4.0
 points = PackedVector2Array(-20, 8, 20, 8)
+width = 4.0
 default_color = Color(0.533333, 0.345098, 0.164706, 1)
 
 [node name="Rung5" type="Line2D" parent="Ladder" unique_id=170000026]
-width = 4.0
 points = PackedVector2Array(-20, 36, 20, 36)
+width = 4.0
 default_color = Color(0.533333, 0.345098, 0.164706, 1)
 
 [node name="Rung6" type="Line2D" parent="Ladder" unique_id=170000040]
-width = 4.0
 points = PackedVector2Array(-20, 64, 20, 64)
+width = 4.0
 default_color = Color(0.533333, 0.345098, 0.164706, 1)
 
 [node name="TrapSlots" type="Node2D" parent="." unique_id=170000027]
@@ -200,26 +292,60 @@ default_color = Color(0.533333, 0.345098, 0.164706, 1)
 color = Color(0.45, 0.45, 0.45, 0.65)
 polygon = PackedVector2Array(735, 730, 785, 730, 805, 750, 715, 750)
 
+[node name="TrapVisual" type="Polygon2D" parent="TrapSlots/TrapSlot1" unique_id=170000074]
+visible = false
+position = Vector2(760, 740)
+color = Color(0.333333, 0.345098, 0.333333, 1)
+polygon = PackedVector2Array(-30, 4, -18, -10, -8, 4, 0, -10, 10, 4, 18, -10, 30, 4, 18, 10, -18, 10)
+
 [node name="TrapSlot2" type="Polygon2D" parent="TrapSlots" unique_id=170000029]
 color = Color(0.45, 0.45, 0.45, 0.65)
 polygon = PackedVector2Array(845, 710, 895, 710, 915, 730, 825, 730)
+
+[node name="TrapVisual" type="Polygon2D" parent="TrapSlots/TrapSlot2" unique_id=170000075]
+visible = false
+position = Vector2(870, 720)
+color = Color(0.333333, 0.345098, 0.333333, 1)
+polygon = PackedVector2Array(-30, 4, -18, -10, -8, 4, 0, -10, 10, 4, 18, -10, 30, 4, 18, 10, -18, 10)
 
 [node name="TrapSlot3" type="Polygon2D" parent="TrapSlots" unique_id=170000030]
 color = Color(0.45, 0.45, 0.45, 0.65)
 polygon = PackedVector2Array(930, 760, 980, 760, 1000, 780, 910, 780)
 
+[node name="TrapVisual" type="Polygon2D" parent="TrapSlots/TrapSlot3" unique_id=170000076]
+visible = false
+position = Vector2(955, 770)
+color = Color(0.333333, 0.345098, 0.333333, 1)
+polygon = PackedVector2Array(-30, 4, -18, -10, -8, 4, 0, -10, 10, 4, 18, -10, 30, 4, 18, 10, -18, 10)
+
+[node name="BackBushLeft" type="Sprite2D" parent="." unique_id=170000062]
+position = Vector2(356, 820)
+scale = Vector2(1.8, 1.8)
+texture = ExtResource("11")
+
+[node name="BackBushRight" type="Sprite2D" parent="." unique_id=170000063]
+position = Vector2(854, 812)
+scale = Vector2(1.8, 1.8)
+texture = ExtResource("11")
+
+[node name="TrapCrate" type="Sprite2D" parent="." unique_id=170000064]
+position = Vector2(1015, 770)
+texture = ExtResource("9")
+
+[node name="TrapBarrel" type="Sprite2D" parent="." unique_id=170000065]
+position = Vector2(1050, 776)
+texture = ExtResource("10")
+
 [node name="LadderZones" type="Node2D" parent="." unique_id=170000034]
 
 [node name="LadderTopZone" type="Area2D" parent="LadderZones" unique_id=170000035]
 position = Vector2(576, 446)
-collision_mask = 1
 
 [node name="CollisionShape2D" type="CollisionShape2D" parent="LadderZones/LadderTopZone" unique_id=170000036]
 shape = SubResource("2")
 
 [node name="LadderBottomZone" type="Area2D" parent="LadderZones" unique_id=170000037]
 position = Vector2(576, 720)
-collision_mask = 1
 
 [node name="CollisionShape2D" type="CollisionShape2D" parent="LadderZones/LadderBottomZone" unique_id=170000038]
 shape = SubResource("2")
@@ -233,7 +359,7 @@ position = Vector2(576, 0)
 position = Vector2(165, 700)
 
 [node name="WallCameraFocus" type="Marker2D" parent="LayoutMarkers" unique_id=170000041]
-position = Vector2(576, 324)
+position = Vector2(576, 255)
 
 [node name="BackAreaCameraFocus" type="Marker2D" parent="LayoutMarkers" unique_id=170000042]
 position = Vector2(576, 700)
@@ -243,8 +369,6 @@ process_mode = 1
 
 [node name="GameCamera" type="Camera2D" parent="." unique_id=170000043]
 position = Vector2(576, 324)
-enabled = true
-position_smoothing_enabled = false
 limit_left = 0
 limit_top = 0
 limit_right = 1152
@@ -288,34 +412,67 @@ layout_mode = 3
 anchors_preset = 0
 offset_left = 16.0
 offset_top = 10.0
-offset_right = 220.0
-offset_bottom = 80.0
+offset_right = 280.0
+offset_bottom = 130.0
 
 [node name="HPLabel" type="Label" parent="UI/HUD" unique_id=1319540310]
 layout_mode = 0
-offset_right = 200.0
+offset_right = 220.0
 offset_bottom = 30.0
 text = "HP: 10"
 
 [node name="CoinsLabel" type="Label" parent="UI/HUD" unique_id=1976989392]
 layout_mode = 0
 offset_top = 28.0
-offset_right = 200.0
+offset_right = 220.0
 offset_bottom = 58.0
 text = "Coins: 0"
 
+[node name="ScoreLabel" type="Label" parent="UI/HUD" unique_id=170000044]
+layout_mode = 0
+offset_top = 56.0
+offset_right = 220.0
+offset_bottom = 86.0
+text = "Score: 0"
+
+[node name="WaveLabel" type="Label" parent="UI/HUD" unique_id=170000045]
+layout_mode = 0
+offset_left = 130.0
+offset_right = 260.0
+offset_bottom = 30.0
+text = "Wave: 1"
+
+[node name="PhaseLabel" type="Label" parent="UI/HUD" unique_id=170000046]
+layout_mode = 0
+offset_left = 130.0
+offset_top = 28.0
+offset_right = 260.0
+offset_bottom = 58.0
+text = "Prep: 15s"
+
+[node name="WaveBanner" type="Label" parent="UI" unique_id=170000077]
+visible = false
+modulate = Color(1, 1, 1, 0)
+offset_left = 316.0
+offset_top = 52.0
+offset_right = 836.0
+offset_bottom = 118.0
+theme_override_font_sizes/font_size = 30
+text = "Wave 1 Start"
+horizontal_alignment = 1
+
 [node name="ShopPanel" type="Panel" parent="UI" unique_id=1303610471]
 visible = false
-offset_left = 426.0
-offset_top = 176.0
-offset_right = 726.0
-offset_bottom = 352.0
+offset_left = 376.0
+offset_top = 140.0
+offset_right = 776.0
+offset_bottom = 410.0
 
 [node name="ShopBackdrop" type="TextureRect" parent="UI/ShopPanel" unique_id=1047769930]
 modulate = Color(1, 1, 1, 0.92)
 layout_mode = 0
-offset_right = 300.0
-offset_bottom = 176.0
+offset_right = 400.0
+offset_bottom = 270.0
 texture = ExtResource("5")
 stretch_mode = 1
 
@@ -323,16 +480,28 @@ stretch_mode = 1
 layout_mode = 0
 offset_left = 12.0
 offset_top = 12.0
-offset_right = 288.0
-offset_bottom = 164.0
+offset_right = 388.0
+offset_bottom = 258.0
 
 [node name="TitleLabel" type="Label" parent="UI/ShopPanel/VBoxContainer" unique_id=420693814]
 layout_mode = 2
 text = "Castle Shop"
 
-[node name="BuyButton" type="Button" parent="UI/ShopPanel/VBoxContainer" unique_id=1218919383]
+[node name="RepairButton" type="Button" parent="UI/ShopPanel/VBoxContainer" unique_id=1218919383]
 layout_mode = 2
-text = "Buy Repair (5 coins)"
+text = "Repair Wall (5)"
+
+[node name="FireRateButton" type="Button" parent="UI/ShopPanel/VBoxContainer" unique_id=170000047]
+layout_mode = 2
+text = "Fire Rate Lv.1 (8)"
+
+[node name="DamageButton" type="Button" parent="UI/ShopPanel/VBoxContainer" unique_id=170000048]
+layout_mode = 2
+text = "Arrow Damage Lv.1 (10)"
+
+[node name="TrapButton" type="Button" parent="UI/ShopPanel/VBoxContainer" unique_id=170000049]
+layout_mode = 2
+text = "Buy Trap Charge (6)"
 
 [node name="CloseButton" type="Button" parent="UI/ShopPanel/VBoxContainer" unique_id=1472166416]
 layout_mode = 2

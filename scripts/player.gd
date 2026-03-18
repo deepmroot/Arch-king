@@ -189,10 +189,10 @@ func _ensure_mouse_action(action_name: String, button: MouseButton) -> void:
 
 
 func _get_move_input() -> Vector2:
-	var right_action := "move_right" if InputMap.has_action("move_right") else "ui_right"
-	var left_action := "move_left" if InputMap.has_action("move_left") else "ui_left"
-	var down_action := "move_down" if InputMap.has_action("move_down") else "ui_down"
-	var up_action := "move_up" if InputMap.has_action("move_up") else "ui_up"
+	var right_action: String = "move_right" if InputMap.has_action("move_right") else "ui_right"
+	var left_action: String = "move_left" if InputMap.has_action("move_left") else "ui_left"
+	var down_action: String = "move_down" if InputMap.has_action("move_down") else "ui_down"
+	var up_action: String = "move_up" if InputMap.has_action("move_up") else "ui_up"
 	return Input.get_vector(left_action, right_action, up_action, down_action)
 
 
