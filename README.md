@@ -31,6 +31,7 @@ The current version is structured around two connected spaces:
 - Ladder transition between back area and wall
 - Fire-rate upgrades
 - Damage upgrades
+- Better projectile feel with arrow trails and hit flashes
 
 ### Level / Camera
 - Split level flow:
@@ -45,6 +46,8 @@ The current version is structured around two connected spaces:
 - Prep phase before/after battle
 - Wave start / wave cleared banners
 - Infinite survival progression
+- Automatic climb-to-wall when prep ends
+- Mixed wave composition instead of only flat stat scaling
 - Enemy scaling over time:
   - more enemies
   - faster enemies
@@ -52,23 +55,29 @@ The current version is structured around two connected spaces:
   - better rewards
 
 ### Shop
-- Repair wall HP
+- Repair wall HP up to a max wall HP cap
 - Upgrade fire rate
 - Upgrade arrow damage
-- Buy trap charges
+- Buy spike traps
+- Buy fire traps
 
 ### Traps
-- Buy trap charges from the shop
+- Swap selected trap type with **Q** or **Tab**
 - Place traps near trap slots in the back area
-- Traps trigger during battle when enemies reach them
+- **Spike traps** kill a single nearby enemy
+- **Fire traps** damage groups in an area
 - Triggered traps are consumed
+- Trap slot highlight appears when standing near a valid slot
 
 ### Combat / Feedback
 - Arrow glow polish
+- Arrow trail and impact flash
 - Enemy hit flash
 - Enemy death fade
+- Visual differences for fast / tank / armored enemies
 - Shadows under player/enemies
 - Wall-hit feedback and camera shake
+- Procedural placeholder sound effects for combat, traps, shop, and wave flow
 
 ### Game Flow
 - Main menu
@@ -86,6 +95,7 @@ The current version is structured around two connected spaces:
 - **S / Down** → move down in back area / climb down ladder during prep
 - **Left Mouse Click** or **Space** → shoot
 - **E** → interact with shop / place trap near a trap slot during prep
+- **Q** or **Tab** → swap selected trap type
 - **Esc** → pause
 
 ### Ladder Rules
@@ -118,7 +128,8 @@ The current version is structured around two connected spaces:
 - **Repair Wall**
 - **Fire Rate Upgrade**
 - **Arrow Damage Upgrade**
-- **Trap Charge**
+- **Spike Trap**
+- **Fire Trap**
 
 ---
 
@@ -173,17 +184,22 @@ Implemented now:
 - prep / battle wave loop
 - score tracking
 - wave UI banners
+- interaction prompts and temporary message UI
 - expanded shop
-- trap purchase and placement
+- spike + fire trap purchase and placement
+- trap selection swapping
 - trap triggering
+- mixed enemy wave composition
+- fast / tank / armored enemy variants
 - camera transitions
 - wall-hit feedback
+- procedural placeholder audio pass
 - visual polish pass for level and combat feel
 
 Still good next targets:
-- more enemy types
-- better trap variety
-- sound effects
+- real audio assets to replace placeholder generated sounds
+- more enemy behaviors beyond stats
+- more trap variety
 - support archers / allied defenders
 - stronger wall/tower art replacement
 

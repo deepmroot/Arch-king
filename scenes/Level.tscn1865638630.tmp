@@ -23,6 +23,23 @@ size = Vector2(140, 56)
 
 [node name="Level" type="Node2D" unique_id=1341620308]
 script = ExtResource("1")
+starting_hp = null
+max_castle_hp = null
+wall_y = null
+wall_margin_from_bottom = null
+repair_cost = null
+spike_trap_cost = null
+fire_trap_cost = null
+slow_trap_cost = null
+fire_rate_upgrade_cost = null
+damage_upgrade_cost = null
+enemy_lane_half_width = null
+player_wall_offset = null
+lower_lane_y = null
+lower_area_top_y = null
+lower_area_bottom_y = null
+ladder_transition_duration = null
+prep_phase_duration = null
 
 [node name="Background" type="Node2D" parent="." unique_id=681541956]
 
@@ -286,6 +303,38 @@ points = PackedVector2Array(-20, 64, 20, 64)
 width = 4.0
 default_color = Color(0.533333, 0.345098, 0.164706, 1)
 
+[node name="TrapSlots" type="Node2D" parent="." unique_id=170000027]
+
+[node name="TrapSlot1" type="Polygon2D" parent="TrapSlots" unique_id=170000028]
+color = Color(0.45, 0.45, 0.45, 0.65)
+polygon = PackedVector2Array(735, 730, 785, 730, 805, 750, 715, 750)
+
+[node name="TrapVisual" type="Polygon2D" parent="TrapSlots/TrapSlot1" unique_id=170000074]
+visible = false
+position = Vector2(760, 740)
+color = Color(0.333333, 0.345098, 0.333333, 1)
+polygon = PackedVector2Array(-30, 4, -18, -10, -8, 4, 0, -10, 10, 4, 18, -10, 30, 4, 18, 10, -18, 10)
+
+[node name="TrapSlot2" type="Polygon2D" parent="TrapSlots" unique_id=170000029]
+color = Color(0.45, 0.45, 0.45, 0.65)
+polygon = PackedVector2Array(845, 710, 895, 710, 915, 730, 825, 730)
+
+[node name="TrapVisual" type="Polygon2D" parent="TrapSlots/TrapSlot2" unique_id=170000075]
+visible = false
+position = Vector2(870, 720)
+color = Color(0.333333, 0.345098, 0.333333, 1)
+polygon = PackedVector2Array(-30, 4, -18, -10, -8, 4, 0, -10, 10, 4, 18, -10, 30, 4, 18, 10, -18, 10)
+
+[node name="TrapSlot3" type="Polygon2D" parent="TrapSlots" unique_id=170000030]
+color = Color(0.45, 0.45, 0.45, 0.65)
+polygon = PackedVector2Array(930, 760, 980, 760, 1000, 780, 910, 780)
+
+[node name="TrapVisual" type="Polygon2D" parent="TrapSlots/TrapSlot3" unique_id=170000076]
+visible = false
+position = Vector2(955, 770)
+color = Color(0.333333, 0.345098, 0.333333, 1)
+polygon = PackedVector2Array(-30, 4, -18, -10, -8, 4, 0, -10, 10, 4, 18, -10, 30, 4, 18, 10, -18, 10)
+
 [node name="BackBushLeft" type="Sprite2D" parent="." unique_id=170000062]
 position = Vector2(356, 820)
 scale = Vector2(1.8, 1.8)
@@ -380,183 +429,50 @@ layout_mode = 3
 anchors_preset = 0
 offset_left = 16.0
 offset_top = 10.0
-offset_right = 350.0
-offset_bottom = 158.0
-
-[node name="HUDShadow" type="ColorRect" parent="UI/HUD" unique_id=170000102]
-layout_mode = 0
-offset_left = 4.0
-offset_top = 6.0
-offset_right = 338.0
-offset_bottom = 146.0
-color = Color(0, 0, 0, 0.18)
-
-[node name="HUDPanel" type="Panel" parent="UI/HUD" unique_id=170000093]
-layout_mode = 0
-offset_right = 334.0
-offset_bottom = 140.0
-
-[node name="HUDBackdrop" type="ColorRect" parent="UI/HUD" unique_id=170000103]
-layout_mode = 0
-offset_left = 6.0
-offset_top = 6.0
-offset_right = 328.0
-offset_bottom = 134.0
-color = Color(0.13, 0.1, 0.08, 0.86)
-
-[node name="HUDInnerShade" type="ColorRect" parent="UI/HUD" unique_id=170000104]
-layout_mode = 0
-offset_left = 12.0
-offset_top = 12.0
-offset_right = 322.0
-offset_bottom = 128.0
-color = Color(0.24, 0.2, 0.15, 0.78)
-
-[node name="TopAccent" type="ColorRect" parent="UI/HUD" unique_id=170000105]
-layout_mode = 0
-offset_left = 12.0
-offset_top = 12.0
-offset_right = 322.0
-offset_bottom = 16.0
-color = Color(0.78, 0.65, 0.35, 0.65)
-
-[node name="StatsTitle" type="Label" parent="UI/HUD" unique_id=170000094]
-layout_mode = 0
-offset_left = 18.0
-offset_top = 18.0
-offset_right = 140.0
-offset_bottom = 38.0
-theme_override_colors/font_color = Color(1, 0.86, 0.52, 1)
-theme_override_font_sizes/font_size = 18
-text = "Wall Status"
-
-[node name="CombatTitle" type="Label" parent="UI/HUD" unique_id=170000095]
-layout_mode = 0
-offset_left = 174.0
-offset_top = 18.0
-offset_right = 312.0
-offset_bottom = 38.0
-theme_override_colors/font_color = Color(1, 0.86, 0.52, 1)
-theme_override_font_sizes/font_size = 18
-text = "Battle Info"
-
-[node name="Divider" type="ColorRect" parent="UI/HUD" unique_id=170000096]
-layout_mode = 0
-offset_left = 154.0
-offset_top = 20.0
-offset_right = 156.0
-offset_bottom = 120.0
-color = Color(0.72, 0.67, 0.56, 0.35)
+offset_right = 280.0
+offset_bottom = 130.0
 
 [node name="HPLabel" type="Label" parent="UI/HUD" unique_id=1319540310]
 layout_mode = 0
-offset_left = 18.0
-offset_top = 42.0
-offset_right = 148.0
-offset_bottom = 64.0
-theme_override_colors/font_color = Color(0.98, 0.94, 0.86, 1)
+offset_right = 220.0
+offset_bottom = 30.0
 text = "HP: 10"
-
-[node name="HPBarBG" type="ColorRect" parent="UI/HUD" unique_id=170000106]
-layout_mode = 0
-offset_left = 18.0
-offset_top = 66.0
-offset_right = 136.0
-offset_bottom = 76.0
-color = Color(0.1, 0.08, 0.07, 0.9)
-
-[node name="HPBarFill" type="ColorRect" parent="UI/HUD/HPBarBG" unique_id=170000107]
-layout_mode = 0
-offset_right = 118.0
-offset_bottom = 10.0
-color = Color(0.32, 0.86, 0.38, 1)
-
-[node name="CoinIcon" type="ColorRect" parent="UI/HUD" unique_id=170000108]
-layout_mode = 0
-offset_left = 18.0
-offset_top = 84.0
-offset_right = 28.0
-offset_bottom = 94.0
-color = Color(1, 0.82, 0.3, 0.95)
 
 [node name="CoinsLabel" type="Label" parent="UI/HUD" unique_id=1976989392]
 layout_mode = 0
-offset_left = 34.0
-offset_top = 78.0
-offset_right = 148.0
-offset_bottom = 100.0
-theme_override_colors/font_color = Color(0.98, 0.94, 0.86, 1)
+offset_top = 28.0
+offset_right = 220.0
+offset_bottom = 58.0
 text = "Coins: 0"
-
-[node name="ScoreIcon" type="ColorRect" parent="UI/HUD" unique_id=170000109]
-layout_mode = 0
-offset_left = 18.0
-offset_top = 108.0
-offset_right = 28.0
-offset_bottom = 118.0
-color = Color(0.75, 0.9, 1, 0.95)
 
 [node name="ScoreLabel" type="Label" parent="UI/HUD" unique_id=170000044]
 layout_mode = 0
-offset_left = 34.0
-offset_top = 102.0
-offset_right = 148.0
-offset_bottom = 124.0
-theme_override_colors/font_color = Color(0.98, 0.94, 0.86, 1)
+offset_top = 56.0
+offset_right = 220.0
+offset_bottom = 86.0
 text = "Score: 0"
-
-[node name="WaveIcon" type="ColorRect" parent="UI/HUD" unique_id=170000110]
-layout_mode = 0
-offset_left = 172.0
-offset_top = 50.0
-offset_right = 182.0
-offset_bottom = 60.0
-color = Color(1, 0.82, 0.3, 0.95)
 
 [node name="WaveLabel" type="Label" parent="UI/HUD" unique_id=170000045]
 layout_mode = 0
-offset_left = 188.0
-offset_top = 44.0
-offset_right = 320.0
-offset_bottom = 66.0
-theme_override_colors/font_color = Color(0.98, 0.94, 0.86, 1)
+offset_left = 130.0
+offset_right = 260.0
+offset_bottom = 30.0
 text = "Wave: 1"
-
-[node name="PhaseIcon" type="ColorRect" parent="UI/HUD" unique_id=170000111]
-layout_mode = 0
-offset_left = 172.0
-offset_top = 78.0
-offset_right = 182.0
-offset_bottom = 88.0
-color = Color(0.45, 0.88, 1, 0.95)
 
 [node name="PhaseLabel" type="Label" parent="UI/HUD" unique_id=170000046]
 layout_mode = 0
-offset_left = 188.0
-offset_top = 72.0
-offset_right = 320.0
-offset_bottom = 94.0
-theme_override_colors/font_color = Color(0.98, 0.94, 0.86, 1)
+offset_left = 130.0
+offset_top = 28.0
+offset_right = 260.0
+offset_bottom = 58.0
 text = "Prep: 15s"
-
-[node name="TrapIcon" type="ColorRect" parent="UI/HUD" unique_id=170000112]
-layout_mode = 0
-offset_left = 172.0
-offset_top = 106.0
-offset_right = 182.0
-offset_bottom = 116.0
-color = Color(1, 0.54, 0.3, 0.95)
 
 [node name="TrapLabel" type="Label" parent="UI/HUD" unique_id=170000078]
 layout_mode = 0
-offset_left = 188.0
-offset_top = 100.0
-offset_right = 324.0
-offset_bottom = 126.0
-theme_override_colors/font_color = Color(0.98, 0.94, 0.86, 1)
-theme_override_font_sizes/font_size = 14
-text = "Armed  S:0 F:0 L:0"
-clip_text = true
+offset_top = 84.0
+offset_right = 260.0
+offset_bottom = 114.0
+text = "Trap: Spike"
 
 [node name="PromptLabel" type="Label" parent="UI" unique_id=170000079]
 offset_left = 250.0
@@ -648,272 +564,63 @@ custom_minimum_size = Vector2(0, 44)
 layout_mode = 2
 text = "Rapid Volley"
 
-[node name="ShopDimmer" type="ColorRect" parent="UI" unique_id=170000100]
-visible = false
-layout_mode = 1
-anchors_preset = 15
-anchor_right = 1.0
-anchor_bottom = 1.0
-grow_horizontal = 2
-grow_vertical = 2
-color = Color(0, 0, 0, 0.42)
-
 [node name="ShopPanel" type="Panel" parent="UI" unique_id=1303610471]
 visible = false
-offset_left = 318.0
-offset_top = 62.0
-offset_right = 834.0
-offset_bottom = 648.0
+offset_left = 356.0
+offset_top = 120.0
+offset_right = 796.0
+offset_bottom = 486.0
 
-[node name="ShopShadow" type="ColorRect" parent="UI/ShopPanel" unique_id=170000113]
+[node name="ShopBackdrop" type="TextureRect" parent="UI/ShopPanel" unique_id=1047769930]
+modulate = Color(1, 1, 1, 0.92)
 layout_mode = 0
-offset_left = 12.0
-offset_top = 14.0
-offset_right = 512.0
-offset_bottom = 582.0
-color = Color(0, 0, 0, 0.2)
-
-[node name="ShopBackdrop" type="ColorRect" parent="UI/ShopPanel" unique_id=1047769930]
-layout_mode = 0
-offset_left = 8.0
-offset_top = 8.0
-offset_right = 508.0
-offset_bottom = 578.0
-color = Color(0.13, 0.1, 0.08, 0.94)
-
-[node name="ShopInnerShade" type="ColorRect" parent="UI/ShopPanel" unique_id=170000101]
-layout_mode = 0
-offset_left = 18.0
-offset_top = 18.0
-offset_right = 498.0
-offset_bottom = 568.0
-color = Color(0.24, 0.2, 0.15, 0.82)
-
-[node name="ShopTopAccent" type="ColorRect" parent="UI/ShopPanel" unique_id=170000114]
-layout_mode = 0
-offset_left = 18.0
-offset_top = 18.0
-offset_right = 498.0
-offset_bottom = 24.0
-color = Color(0.78, 0.65, 0.35, 0.7)
-
-[node name="ShopDivider1" type="ColorRect" parent="UI/ShopPanel" unique_id=170000115]
-layout_mode = 0
-offset_left = 28.0
-offset_top = 220.0
-offset_right = 488.0
-offset_bottom = 222.0
-color = Color(0.72, 0.67, 0.56, 0.24)
-
-[node name="ShopDivider2" type="ColorRect" parent="UI/ShopPanel" unique_id=170000116]
-layout_mode = 0
-offset_left = 28.0
-offset_top = 420.0
-offset_right = 488.0
-offset_bottom = 422.0
-color = Color(0.72, 0.67, 0.56, 0.24)
+offset_right = 440.0
+offset_bottom = 366.0
+texture = ExtResource("5")
+stretch_mode = 1
 
 [node name="VBoxContainer" type="VBoxContainer" parent="UI/ShopPanel" unique_id=245566503]
 layout_mode = 0
-offset_left = 28.0
-offset_top = 24.0
-offset_right = 488.0
-offset_bottom = 560.0
-theme_override_constants/separation = 8
+offset_left = 12.0
+offset_top = 12.0
+offset_right = 428.0
+offset_bottom = 354.0
 
 [node name="TitleLabel" type="Label" parent="UI/ShopPanel/VBoxContainer" unique_id=420693814]
 layout_mode = 2
-theme_override_colors/font_color = Color(1, 0.86, 0.52, 1)
-theme_override_font_sizes/font_size = 24
 text = "Castle Shop"
-horizontal_alignment = 1
-
-[node name="SubtitleLabel" type="Label" parent="UI/ShopPanel/VBoxContainer" unique_id=170000097]
-layout_mode = 2
-theme_override_colors/font_color = Color(0.95, 0.92, 0.84, 1)
-text = "Prepare the wall before the next wave."
-horizontal_alignment = 1
-autowrap_mode = 2
-
-[node name="CategoryTabs" type="HBoxContainer" parent="UI/ShopPanel/VBoxContainer" unique_id=170000124]
-layout_mode = 2
-theme_override_constants/separation = 6
-
-[node name="FortressTabButton" type="Button" parent="UI/ShopPanel/VBoxContainer/CategoryTabs" unique_id=170000125]
-custom_minimum_size = Vector2(0, 38)
-layout_mode = 2
-size_flags_horizontal = 3
-theme_override_colors/font_color = Color(1, 0.93, 0.82, 1)
-theme_override_font_sizes/font_size = 15
-text = "⌂ Fortress"
-
-[node name="DefensesTabButton" type="Button" parent="UI/ShopPanel/VBoxContainer/CategoryTabs" unique_id=170000126]
-custom_minimum_size = Vector2(0, 38)
-layout_mode = 2
-size_flags_horizontal = 3
-theme_override_colors/font_color = Color(1, 0.93, 0.82, 1)
-theme_override_font_sizes/font_size = 15
-text = "✦ Defenses"
-
-[node name="TacticsTabButton" type="Button" parent="UI/ShopPanel/VBoxContainer/CategoryTabs" unique_id=170000127]
-custom_minimum_size = Vector2(0, 38)
-layout_mode = 2
-size_flags_horizontal = 3
-theme_override_colors/font_color = Color(1, 0.93, 0.82, 1)
-theme_override_font_sizes/font_size = 15
-text = "➤ Tactics"
-
-[node name="TrapsTabButton" type="Button" parent="UI/ShopPanel/VBoxContainer/CategoryTabs" unique_id=170000128]
-custom_minimum_size = Vector2(0, 38)
-layout_mode = 2
-size_flags_horizontal = 3
-theme_override_colors/font_color = Color(1, 0.93, 0.82, 1)
-theme_override_font_sizes/font_size = 15
-text = "▲ Traps"
-
-[node name="StructureHeader" type="Label" parent="UI/ShopPanel/VBoxContainer" unique_id=170000117]
-layout_mode = 2
-theme_override_colors/font_color = Color(1, 0.86, 0.52, 1)
-theme_override_font_sizes/font_size = 18
-text = "Fortress"
-
-[node name="WallUpgradeButton" type="Button" parent="UI/ShopPanel/VBoxContainer" unique_id=170000118]
-custom_minimum_size = Vector2(0, 40)
-layout_mode = 2
-theme_override_colors/font_color = Color(0.98, 0.94, 0.86, 1)
-theme_override_font_sizes/font_size = 16
-text = "▣ Wall Level 2 (12)"
-
-[node name="KeepUpgradeButton" type="Button" parent="UI/ShopPanel/VBoxContainer" unique_id=170000119]
-custom_minimum_size = Vector2(0, 40)
-layout_mode = 2
-theme_override_colors/font_color = Color(0.98, 0.94, 0.86, 1)
-theme_override_font_sizes/font_size = 16
-text = "⌂ Keep Level 2 (18)"
-
-[node name="TurretButton" type="Button" parent="UI/ShopPanel/VBoxContainer" unique_id=170000120]
-custom_minimum_size = Vector2(0, 40)
-layout_mode = 2
-theme_override_colors/font_color = Color(0.98, 0.94, 0.86, 1)
-theme_override_font_sizes/font_size = 16
-text = "➹ Arrow Turret (Unlock at Keep 2)"
-
-[node name="TurretModeButton" type="Button" parent="UI/ShopPanel/VBoxContainer" unique_id=170000122]
-custom_minimum_size = Vector2(0, 36)
-layout_mode = 2
-theme_override_colors/font_color = Color(0.9, 0.88, 0.78, 1)
-theme_override_font_sizes/font_size = 14
-text = "Turret Target: Closest"
-
-[node name="CatapultButton" type="Button" parent="UI/ShopPanel/VBoxContainer" unique_id=170000121]
-custom_minimum_size = Vector2(0, 40)
-layout_mode = 2
-theme_override_colors/font_color = Color(0.98, 0.94, 0.86, 1)
-theme_override_font_sizes/font_size = 16
-text = "✪ Catapult (Unlock at Keep 3)"
-
-[node name="CatapultModeButton" type="Button" parent="UI/ShopPanel/VBoxContainer" unique_id=170000123]
-custom_minimum_size = Vector2(0, 36)
-layout_mode = 2
-theme_override_colors/font_color = Color(0.9, 0.88, 0.78, 1)
-theme_override_font_sizes/font_size = 14
-text = "Catapult Target: Grouped"
-
-[node name="UpgradeHeader" type="Label" parent="UI/ShopPanel/VBoxContainer" unique_id=170000098]
-layout_mode = 2
-theme_override_colors/font_color = Color(1, 0.86, 0.52, 1)
-theme_override_font_sizes/font_size = 18
-text = "Battle Prep"
 
 [node name="RepairButton" type="Button" parent="UI/ShopPanel/VBoxContainer" unique_id=1218919383]
-custom_minimum_size = Vector2(0, 40)
 layout_mode = 2
-theme_override_colors/font_color = Color(0.98, 0.94, 0.86, 1)
-theme_override_font_sizes/font_size = 16
-text = "⚒ Repair Wall (5)"
+text = "Repair Wall (5)"
 
 [node name="FireRateButton" type="Button" parent="UI/ShopPanel/VBoxContainer" unique_id=170000047]
-custom_minimum_size = Vector2(0, 40)
 layout_mode = 2
-theme_override_colors/font_color = Color(0.98, 0.94, 0.86, 1)
-theme_override_font_sizes/font_size = 16
-text = "➤ Fire Rate Lv.1 (8)"
+text = "Fire Rate Lv.1 (8)"
 
 [node name="DamageButton" type="Button" parent="UI/ShopPanel/VBoxContainer" unique_id=170000048]
-custom_minimum_size = Vector2(0, 40)
 layout_mode = 2
-theme_override_colors/font_color = Color(0.98, 0.94, 0.86, 1)
-theme_override_font_sizes/font_size = 16
-text = "✦ Arrow Damage Lv.1 (10)"
-
-[node name="TrapHeader" type="Label" parent="UI/ShopPanel/VBoxContainer" unique_id=170000099]
-layout_mode = 2
-theme_override_colors/font_color = Color(1, 0.86, 0.52, 1)
-theme_override_font_sizes/font_size = 18
-text = "Traps"
+text = "Arrow Damage Lv.1 (10)"
 
 [node name="TrapButton" type="Button" parent="UI/ShopPanel/VBoxContainer" unique_id=170000049]
-custom_minimum_size = Vector2(0, 40)
 layout_mode = 2
-theme_override_colors/font_color = Color(0.98, 0.94, 0.86, 1)
-theme_override_font_sizes/font_size = 16
-text = "▲ Buy Spike Trap (6)"
+text = "Buy Spike Trap (6)"
 
 [node name="FireTrapButton" type="Button" parent="UI/ShopPanel/VBoxContainer" unique_id=170000081]
-custom_minimum_size = Vector2(0, 40)
 layout_mode = 2
-theme_override_colors/font_color = Color(0.98, 0.94, 0.86, 1)
-theme_override_font_sizes/font_size = 16
-text = "✹ Buy Fire Trap (8)"
+text = "Buy Fire Trap (8)"
 
 [node name="SlowTrapButton" type="Button" parent="UI/ShopPanel/VBoxContainer" unique_id=170000082]
-custom_minimum_size = Vector2(0, 40)
 layout_mode = 2
-theme_override_colors/font_color = Color(0.98, 0.94, 0.86, 1)
-theme_override_font_sizes/font_size = 16
-text = "❄ Buy Slow Trap (9)"
-
-[node name="InfoPanel" type="Panel" parent="UI/ShopPanel/VBoxContainer" unique_id=170000129]
-custom_minimum_size = Vector2(0, 92)
-layout_mode = 2
-
-[node name="InfoVBox" type="VBoxContainer" parent="UI/ShopPanel/VBoxContainer/InfoPanel" unique_id=170000130]
-layout_mode = 1
-anchors_preset = 15
-anchor_right = 1.0
-anchor_bottom = 1.0
-offset_left = 10.0
-offset_top = 8.0
-offset_right = -10.0
-offset_bottom = -8.0
-grow_horizontal = 2
-grow_vertical = 2
-theme_override_constants/separation = 4
-
-[node name="InfoTitleLabel" type="Label" parent="UI/ShopPanel/VBoxContainer/InfoPanel/InfoVBox" unique_id=170000131]
-layout_mode = 2
-theme_override_colors/font_color = Color(1, 0.86, 0.52, 1)
-theme_override_font_sizes/font_size = 16
-text = "Fortress Upgrades"
-
-[node name="InfoBodyLabel" type="Label" parent="UI/ShopPanel/VBoxContainer/InfoPanel/InfoVBox" unique_id=170000132]
-layout_mode = 2
-theme_override_colors/font_color = Color(0.95, 0.92, 0.84, 1)
-text = "Strengthen your wall, expand the keep, and unlock better defenses."
-autowrap_mode = 2
+text = "Buy Slow Trap (9)"
 
 [node name="CloseButton" type="Button" parent="UI/ShopPanel/VBoxContainer" unique_id=1472166416]
-custom_minimum_size = Vector2(0, 40)
 layout_mode = 2
-theme_override_colors/font_color = Color(1, 0.9, 0.65, 1)
-theme_override_font_sizes/font_size = 16
 text = "Close Shop"
 
 [node name="MessageLabel" type="Label" parent="UI/ShopPanel/VBoxContainer" unique_id=311731260]
-visible = false
 layout_mode = 2
-theme_override_colors/font_color = Color(0.95, 0.92, 0.84, 1)
-text = ""
+text = "Spend coins to buy upgrades."
 autowrap_mode = 2
 
 [node name="MainMenuPanel" type="Panel" parent="UI" unique_id=200000000]

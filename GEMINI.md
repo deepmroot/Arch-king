@@ -58,9 +58,9 @@ This document provides a comprehensive overview of the **ArchKing** Godot projec
 - **Perspective:** Shifted to match a "Forest Path" reference image.
 - **Background:** Added a central path (`dirt_tile`) and forest floor (`grass_tile`).
 - **Layout:** 
-    - Added side towers (`LeftTower`, `RightTower`) that act as movement boundaries.
-    - Repositioned the wall higher (`wall_y = 536`) to allow for a "behind-the-wall" shop area.
-    - Added environment decorations (trees) and a visual `ShopStall` building.
+	- Added side towers (`LeftTower`, `RightTower`) that act as movement boundaries.
+	- Repositioned the wall higher (`wall_y = 536`) to allow for a "behind-the-wall" shop area.
+	- Added environment decorations (trees) and a visual `ShopStall` building.
 
 ---
 
@@ -70,10 +70,10 @@ This document provides a comprehensive overview of the **ArchKing** Godot projec
 - **Player Speed:** 350.0.
 - **Arrow Speed:** 700.0.
 - **Collision Layers:**
-    - Layer 1: Player
-    - Layer 2: Enemy
-    - Layer 3: Projectile
-    - Layer 4: Shop
+	- Layer 1: Player
+	- Layer 2: Enemy
+	- Layer 3: Projectile
+	- Layer 4: Shop
 
 ---
 

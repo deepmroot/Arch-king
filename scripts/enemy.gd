@@ -2,6 +2,8 @@ extends Area2D
 
 signal enemy_killed(reward: int)
 signal reached_wall(damage: int)
+signal wall_attacked(damage: int)
+signal enemy_hit(damage_dealt: int, killed: bool, target_type: String, world_position: Vector2, elite: bool)
 
 const GOBLIN_SHEET := preload("res://assets/enemies/goblin.png")
 
@@ -10,28 +12,112 @@ const GOBLIN_SHEET := preload("res://assets/enemies/goblin.png")
 @export var coin_reward := 1
 @export var wall_y := 110.0
 @export var castle_damage := 1
+@export var armor := 0
 
 var is_dead := false
 var current_health := 1
+var enemy_type := "grunt"
+var is_elite := false
+var attack_mode := "melee"
+var attack_interval := 1.15
+var attack_timer := 0.0
+var attack_line_y := 0.0
+var slow_multiplier := 1.0
+var slow_time_remaining := 0.0
+var shield_points := 0
+var base_tint := Color(1, 1, 1, 1)
+var burst_speed_multiplier := 1.0
+var burst_duration := 0.0
+var burst_cooldown := 0.0
+var burst_time_remaining := 0.0
+var burst_cooldown_remaining := 0.0
+var target_position := Vector2.ZERO
+var stop_distance := 12.0
 
 @onready var animated_sprite: AnimatedSprite2D = $AnimatedSprite2D
 @onready var collision_shape: CollisionShape2D = $CollisionShape2D
 @onready var shadow: Polygon2D = $Shadow
+
+var health_bar_root: Node2D
+var health_bar_bg: Polygon2D
+var health_bar_fill: Polygon2D
+var elite_marker: Polygon2D
 
 
 func _ready() -> void:
 	add_to_group("enemies")
 	current_health = max_health
 	_build_animations()
+	_build_status_visuals()
 	animated_sprite.play("walk")
 	animated_sprite.animation_finished.connect(_on_animation_finished)
+	_update_health_bar()
+
+
+func configure(definition: Dictionary) -> void:
+	enemy_type = str(definition.get("enemy_type", enemy_type))
+	speed = float(definition.get("speed", speed))
+	max_health = int(definition.get("max_health", max_health))
+	coin_reward = int(definition.get("coin_reward", coin_reward))
+	castle_damage = int(definition.get("castle_damage", castle_damage))
+	armor = int(definition.get("armor", armor))
+	is_elite = bool(definition.get("elite", false))
+	attack_mode = str(definition.get("attack_mode", "melee"))
+	attack_interval = float(definition.get("attack_interval", attack_interval))
+	attack_line_y = float(definition.get("attack_line_y", wall_y - 120.0))
+	attack_timer = attack_interval
+	shield_points = int(definition.get("shield_points", 0))
+	burst_speed_multiplier = float(definition.get("burst_speed_multiplier", 1.0))
+	burst_duration = float(definition.get("burst_duration", 0.0))
+	burst_cooldown = float(definition.get("burst_cooldown", 0.0))
+	burst_time_remaining = burst_duration
+	burst_cooldown_remaining = 0.0
+	var visual_scale := float(definition.get("scale", 1.0))
+	var tint: Color = definition.get("tint", Color(1, 1, 1, 1))
+	base_tint = tint
+	animated_sprite.scale = Vector2.ONE * 0.1 * visual_scale
+	animated_sprite.modulate = base_tint
+	shadow.scale = Vector2.ONE * visual_scale
+	current_health = max_health
+	if is_elite and elite_marker != null:
+		elite_marker.visible = true
+		elite_marker.scale = Vector2.ONE * clamp(visual_scale, 1.0, 1.6)
+	_update_health_bar()
 
 
 func _process(delta: float) -> void:
 	if is_dead:
 		return
 
-	global_position.y += speed * delta
+	if slow_time_remaining > 0.0:
+		slow_time_remaining = max(slow_time_remaining - delta, 0.0)
+		if slow_time_remaining <= 0.0:
+			slow_multiplier = 1.0
+
+	if burst_duration > 0.0 and burst_speed_multiplier > 1.0:
+		if burst_time_remaining > 0.0:
+			burst_time_remaining = max(burst_time_remaining - delta, 0.0)
+		elif burst_cooldown_remaining > 0.0:
+			burst_cooldown_remaining = max(burst_cooldown_remaining - delta, 0.0)
+		else:
+			burst_time_remaining = burst_duration
+			burst_cooldown_remaining = burst_cooldown
+
+	var movement_multiplier := slow_multiplier
+	if burst_time_remaining > 0.0:
+		movement_multiplier *= burst_speed_multiplier
+
+	if attack_mode == "ranged" and global_position.y >= attack_line_y:
+		global_position.y = attack_line_y
+		attack_timer -= delta
+		animated_sprite.speed_scale = 0.75
+		if attack_timer <= 0.0:
+			attack_timer = attack_interval
+			_perform_ranged_attack()
+		return
+
+	animated_sprite.speed_scale = 1.22 if burst_time_remaining > 0.0 else 1.0
+	global_position.y += speed * movement_multiplier * delta
 
 	if global_position.y >= wall_y:
 		is_dead = true
@@ -43,8 +129,19 @@ func take_damage(amount: int = 1) -> void:
 	if is_dead:
 		return
 
-	current_health -= amount
+	if shield_points > 0 and amount < 999:
+		shield_points -= 1
+		enemy_hit.emit(0, false, "shield_block", global_position + Vector2(0, -28), is_elite)
+		_flash_shield_block()
+		return
+
+	var final_damage: int = max(1, amount - armor)
+	current_health -= final_damage
+	var was_killed := current_health <= 0
+	enemy_hit.emit(final_damage, was_killed, enemy_type, global_position + Vector2(0, -28), is_elite)
 	_flash_hit()
+	global_position.y -= min(12.0, float(final_damage) * 3.0)
+	_update_health_bar()
 	if current_health > 0:
 		return
 
@@ -52,9 +149,31 @@ func take_damage(amount: int = 1) -> void:
 	collision_shape.disabled = true
 	enemy_killed.emit(coin_reward)
 	animated_sprite.play("death")
-	var tween: Tween = create_tween()
-	tween.parallel().tween_property(animated_sprite, "modulate", Color(1, 1, 1, 0.0), 0.22)
+	var tween: Tween = animated_sprite.create_tween()
+	tween.parallel().tween_property(animated_sprite, "modulate", Color(animated_sprite.modulate.r, animated_sprite.modulate.g, animated_sprite.modulate.b, 0.0), 0.22)
 	tween.parallel().tween_property(shadow, "modulate", Color(0, 0, 0, 0.0), 0.22)
+	if health_bar_root != null:
+		tween.parallel().tween_property(health_bar_root, "modulate", Color(1, 1, 1, 0.0), 0.18)
+
+
+func apply_slow(multiplier: float, duration: float) -> void:
+	if is_dead:
+		return
+
+	slow_multiplier = min(slow_multiplier, clamp(multiplier, 0.2, 1.0))
+	slow_time_remaining = max(slow_time_remaining, duration)
+	var tint_boost := Color(0.8, 0.92, 1.2, animated_sprite.modulate.a)
+	animated_sprite.modulate = tint_boost
+	var tween := animated_sprite.create_tween()
+	tween.tween_property(animated_sprite, "modulate", base_tint, 0.18)
+
+
+func _perform_ranged_attack() -> void:
+	wall_attacked.emit(castle_damage)
+	var base_color := animated_sprite.modulate
+	animated_sprite.modulate = Color(min(base_color.r + 0.25, 1.4), min(base_color.g + 0.18, 1.35), min(base_color.b + 0.1, 1.2), base_color.a)
+	var tween := animated_sprite.create_tween()
+	tween.tween_property(animated_sprite, "modulate", base_color, 0.16)
 
 
 func _on_animation_finished() -> void:
@@ -63,9 +182,93 @@ func _on_animation_finished() -> void:
 
 
 func _flash_hit() -> void:
-	animated_sprite.modulate = Color(1.6, 1.2, 1.2, 1)
-	var tween: Tween = create_tween()
-	tween.tween_property(animated_sprite, "modulate", Color(1, 1, 1, 1), 0.12)
+	var base_color := animated_sprite.modulate
+	animated_sprite.modulate = Color(min(base_color.r + 0.5, 1.6), min(base_color.g + 0.25, 1.4), min(base_color.b + 0.25, 1.4), base_color.a)
+	var tween: Tween = animated_sprite.create_tween()
+	tween.tween_property(animated_sprite, "modulate", base_color, 0.12)
+
+
+func _flash_shield_block() -> void:
+	var base_color := animated_sprite.modulate
+	animated_sprite.modulate = Color(0.75, 0.92, 1.2, base_color.a)
+	var tween: Tween = animated_sprite.create_tween()
+	tween.tween_property(animated_sprite, "modulate", base_color, 0.1)
+
+
+func get_health_ratio() -> float:
+	return clamp(float(current_health) / max(float(max_health), 1.0), 0.0, 1.0)
+
+
+func is_boss_enemy() -> bool:
+	return enemy_type == "boss"
+
+
+func get_display_name() -> String:
+	match enemy_type:
+		"boss":
+			return "War Chief"
+		"shield":
+			return "Shield Bearer"
+		"ranged":
+			return "Raider"
+		"runner":
+			return "Runner"
+		_:
+			return enemy_type.capitalize()
+
+
+func _build_status_visuals() -> void:
+	health_bar_root = Node2D.new()
+	health_bar_root.position = Vector2(-22, -34)
+	add_child(health_bar_root)
+
+	health_bar_bg = Polygon2D.new()
+	health_bar_bg.color = Color(0.08, 0.08, 0.1, 0.72)
+	health_bar_bg.polygon = PackedVector2Array([
+		Vector2(0, 0), Vector2(44, 0), Vector2(44, 6), Vector2(0, 6)
+	])
+	health_bar_root.add_child(health_bar_bg)
+
+	health_bar_fill = Polygon2D.new()
+	health_bar_fill.color = Color(0.3, 0.92, 0.38, 0.95)
+	health_bar_fill.position = Vector2(2, 1)
+	health_bar_fill.polygon = PackedVector2Array([
+		Vector2(0, 0), Vector2(40, 0), Vector2(40, 4), Vector2(0, 4)
+	])
+	health_bar_root.add_child(health_bar_fill)
+
+	elite_marker = Polygon2D.new()
+	elite_marker.visible = false
+	elite_marker.position = Vector2(0, -48)
+	elite_marker.color = Color(1.0, 0.82, 0.24, 0.95)
+	elite_marker.polygon = PackedVector2Array([
+		Vector2(0, -7), Vector2(3, -2), Vector2(8, -2), Vector2(4, 2),
+		Vector2(5, 8), Vector2(0, 5), Vector2(-5, 8), Vector2(-4, 2),
+		Vector2(-8, -2), Vector2(-3, -2)
+	])
+	add_child(elite_marker)
+
+
+func _update_health_bar() -> void:
+	if health_bar_root == null or health_bar_fill == null or health_bar_bg == null:
+		return
+
+	var should_show := max_health > 1 or is_elite or enemy_type == "boss" or enemy_type == "ranged" or enemy_type == "shield"
+	health_bar_root.visible = should_show and not is_dead
+	if not should_show:
+		return
+
+	var ratio: float = clamp(float(current_health) / max(float(max_health), 1.0), 0.0, 1.0)
+	health_bar_fill.scale.x = ratio
+	if ratio > 0.65:
+		health_bar_fill.color = Color(0.3, 0.92, 0.38, 0.95)
+	elif ratio > 0.3:
+		health_bar_fill.color = Color(0.95, 0.78, 0.2, 0.95)
+	else:
+		health_bar_fill.color = Color(1.0, 0.32, 0.25, 0.95)
+
+	if elite_marker != null:
+		elite_marker.visible = is_elite
 
 
 func _build_animations() -> void:
