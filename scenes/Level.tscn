@@ -796,7 +796,7 @@ custom_minimum_size = Vector2(0, 40)
 layout_mode = 2
 theme_override_colors/font_color = Color(0.98, 0.94, 0.86, 1)
 theme_override_font_sizes/font_size = 16
-text = "➹ Arrow Turret (Unlock at Keep 2)"
+text = "➹ Arrow Turret (16)"
 
 [node name="TurretModeButton" type="Button" parent="UI/ShopPanel/VBoxContainer" unique_id=170000122]
 custom_minimum_size = Vector2(0, 36)

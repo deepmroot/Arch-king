@@ -1,25 +1,27 @@
 # ArchKing - Project Documentation & Handover
 
 This document provides a comprehensive overview of the **ArchKing** Godot project, its architectural evolution, and the current state of the codebase. It is designed to help any AI model or human developer quickly understand, debug, and expand upon the project.
-
+1
 ---
 
 ## 1. Project Core Identity
 **ArchKing** is a 2D castle defense game built in **Godot 4.6**.
-- **Perspective:** Top-down/Orthographic.
-- **Goal:** Defend the castle wall at the bottom of the screen against falling/marching enemies.
-- **Controls:** `A/D` or `Arrows` to move, `Mouse Click` to aim and shoot, `E` to interact with the shop, `Esc` to pause.
+- **Perspective:** Stylized orthographic / top-down fortress defense.
+- **Goal:** Defend the castle wall through alternating prep and battle phases.
+- **Current layout:** A wall combat lane above and a back-area support/shop space below.
+- **Controls:** Keyboard + mouse, with basic gamepad support. `F11` toggles fullscreen.
 
 ---
 
 ## 2. Architecture & Systems
 
 ### **Level Management (`level.gd`)**
-- Acts as the central orchestrator (Game State, UI, Spawning).
-- **Global States:** Manages `castle_hp`, `coins`, and `is_game_over`.
-- **UI Interaction:** Controls the Main Menu, Pause Menu, Game Over screen, and HUD updates.
-- **Input Action Bootstrapping:** Dynamically ensures required InputMap actions exist at runtime.
-- **Process Mode:** Set to `PROCESS_MODE_ALWAYS` to allow pause menu logic while gameplay nodes are halted.
+- Acts as the central orchestrator (game state, UI, spawning, shop, fortress systems, audio, options).
+- **Global States:** Manages `castle_hp`, `coins`, `score`, waves/phases, fortress progression, and game over state.
+- **UI Interaction:** Controls HUD, shop tabs, prompts, temporary messages, boss UI, main menu, pause menu, game over, and options.
+- **Input Action Bootstrapping:** Dynamically ensures keyboard, mouse, and gamepad InputMap actions exist at runtime.
+- **Responsive Layout:** Repositions key world/camera/UI elements when viewport size changes.
+- **Process Mode:** Set to `PROCESS_MODE_ALWAYS` to allow pause/options/menu logic while gameplay nodes are halted.
 
 ### **Player Controller (`player.gd`)**
 - **Movement:** Horizontal movement constrained between towers (`left_bound`, `right_bound`).
@@ -28,47 +30,58 @@ This document provides a comprehensive overview of the **ArchKing** Godot projec
 - **Facing Logic:** Sprite flips based on movement direction (default faces Right).
 
 ### **Enemy System (`enemy.gd`)**
-- **Behavior:** March downward toward the wall.
-- **Combat:** Connects to `enemy_killed` (gives coins) and `reached_wall` (deals damage) signals.
-- **Group:** Belongs to the `"enemies"` group for projectile detection.
+- Supports multiple enemy archetypes and elite/boss variants.
+- Enemies move toward the wall or use ranged attack behavior depending on configuration.
+- Connects to kill, wall-hit, and hit-feedback signals used by `level.gd`.
 
 ### **Projectile System (`arrow.gd`)**
-- **Movement:** Uses `set_direction(target_pos)` to calculate velocity and rotation based on mouse input.
-- **Cleanup:** Automatically frees itself when leaving the viewport.
+- Uses `set_direction(target_pos)` to calculate velocity and rotation.
+- Shared by player and turret shots.
+- Automatically frees itself when leaving the viewport.
+
+### **Options UI (`options_panel.gd`)**
+- Reusable settings panel scene used by the main menu / pause flow.
+- Emits settings changes for display mode, resolution scale, and audio values.
+- Supports focusable controls for keyboard/gamepad navigation.
 
 ---
 
 ## 3. Evolutionary Log (What was changed)
 
-### **Phase 1: Initial Setup**
-- Basic horizontal movement and vertical shooting.
-- Simple color-band wall and tiled background.
-- Basic Enemy spawning at the top.
+### **Current implemented systems**
+- Split **prep vs battle** game loop.
+- Ladder traversal between the lower support area and upper wall lane.
+- Structured enemy waves with mixed compositions and periodic boss waves.
+- Expanded shop with fortress, defenses, tactics, and traps tabs.
+- Fortress progression including wall upgrades, keep upgrades, turrets, catapults, and trap coverage growth.
+- Trap system with spike, fire, and slow trap deployment to battlefield points.
+- Floating combat text and improved combat feedback.
+- Main menu, pause, game over, and a reusable options panel.
+- Procedural placeholder SFX plus generated background music.
+- Responsive fullscreen/widescreen support with adaptive horizontal layout.
 
-### **Phase 2: UI & UX Enhancements**
-- **Pause System:** Added `Esc` key handling and a `PausePanel`. Explicitly set gameplay nodes to `PAUSABLE` to ensure they stop during pause.
-- **Game Flow:** Implemented a **Main Menu** (start game) and a **Game Over** panel with a **Restart** button (scene reload).
-- **Shop System:** Added a `ShopZone` where players can spend coins to repair the wall.
-
-### **Phase 3: Gameplay Mechanics Refinement**
-- **Mouse Aiming:** Switched from fixed upward shooting to dynamic mouse-based aiming. The arrow now follows the vector from the player to the mouse click position.
-- **Animation Fixes:** Corrected the sprite-flipping logic where the character was moving/facing backwards.
-
-### **Phase 4: Visual Redesign (Reference Match)**
-- **Perspective:** Shifted to match a "Forest Path" reference image.
-- **Background:** Added a central path (`dirt_tile`) and forest floor (`grass_tile`).
-- **Layout:** 
-	- Added side towers (`LeftTower`, `RightTower`) that act as movement boundaries.
-	- Repositioned the wall higher (`wall_y = 536`) to allow for a "behind-the-wall" shop area.
-	- Added environment decorations (trees) and a visual `ShopStall` building.
+### **Recent additions**
+- Added a dedicated `OptionsPanel` scene and saved settings via `user://settings.cfg`.
+- Added display mode support: fullscreen, borderless, windowed.
+- Added resolution scale setting.
+- Added basic gamepad mappings and menu navigation support.
+- Added/expanded turret gameplay:
+	- cheaper and earlier unlock
+	- stronger damage/range/fire rate
+	- turret targeting controls
+	- turret tracer, muzzle flash, impact sparks, and hover-only range preview
+	- distinct turret sound
+- Removed committed temporary `.tmp` scene files and added ignore rules for temp files.
 
 ---
 
 ## 4. Technical Constants & Layout Data
-- **Viewport Size:** 1152 x 648.
-- **Wall Y Position:** 536.0.
+- **Base Viewport Size:** 1152 x 900.
+- **Stretch Mode:** `canvas_items`
+- **Stretch Aspect:** `expand`
+- **Window Modes:** fullscreen, borderless, windowed
+- **Wall Y Position:** approximately 470.0 in current layout logic.
 - **Player Speed:** 350.0.
-- **Arrow Speed:** 700.0.
 - **Collision Layers:**
 	- Layer 1: Player
 	- Layer 2: Enemy
@@ -78,14 +91,18 @@ This document provides a comprehensive overview of the **ArchKing** Godot projec
 ---
 
 ## 5. Potential Next Steps (Backlog)
-- [ ] **Wave System:** Instead of infinite random spawning, implement structured waves with increasing difficulty.
-- [ ] **Enemy Variety:** Add "Archer Goblins" (stay at a distance and shoot back) or "Shield Goblins" (higher HP).
-- [ ] **Traps:** Use the remaining assets to implement placeable traps (e.g., bear traps seen in reference).
-- [ ] **Sound Effects:** Add feedback for shooting, enemy death, and purchases.
+- [ ] Split `level.gd` into smaller managers/systems.
+- [ ] Replace generated music/SFX with authored assets.
+- [ ] Add more distinct enemy behaviors beyond stat mixes.
+- [ ] Add more fortress defenses / upgrades / synergies.
+- [ ] Improve turret art so rotation affects a separate head/barrel instead of the full shape.
+- [ ] Continue widescreen decoration/layout polish.
 
 ---
 
 ## 6. Debugging Notes
-- If nodes are moving during pause, check their `process_mode` in the Inspector. It should be `Pausable` (Inherit) while the `Level` root is `Always`.
-- If the player goes off-screen, check `left_bound` and `right_bound` in `level.gd`.
-- Texture UIDs are stored in `.import` files; if textures are missing, verify the `ext_resource` IDs in `Level.tscn`.
+- If nodes are moving during pause, check their `process_mode` in the Inspector. `Level` and menu/options logic intentionally use `PROCESS_MODE_ALWAYS`.
+- If the player goes off-screen or UI looks wrong on wide monitors, inspect `_update_responsive_layout()` in `level.gd`.
+- If settings behave oddly, inspect `user://settings.cfg` and the `OptionsPanel` signals.
+- If strict GDScript warnings are treated as errors, prefer explicit typing over `:=` when values may be inferred from `Variant`.
+- Texture/resource UIDs are stored in `.import` files; if textures are missing, verify `ext_resource` IDs in `.tscn` files.

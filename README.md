@@ -33,12 +33,15 @@ The current version is structured around two connected spaces:
 - Damage upgrades
 - Better projectile feel with arrow trails and hit flashes
 
-### Level / Camera
+### Level / Camera / Display
 - Split level flow:
   - **battlefield view** on the wall
   - **back-area view** below the wall
 - Camera transitions when moving up/down the ladder
-- Tighter battle framing so more of the goblin lane is visible
+- Responsive widescreen/fullscreen layout
+- Adaptive horizontal expansion for wider monitors
+- Fullscreen, borderless, and windowed display support
+- Resolution scale option
 - Back area for shop + trap setup
 
 ### Waves
@@ -48,42 +51,78 @@ The current version is structured around two connected spaces:
 - Infinite survival progression
 - Automatic climb-to-wall when prep ends
 - Mixed wave composition instead of only flat stat scaling
+- Enemy variants including:
+  - runner
+  - ranged
+  - tank
+  - shield
+  - armored
+  - elite variants
+  - boss waves
 - Enemy scaling over time:
   - more enemies
   - faster enemies
   - more HP
   - better rewards
 
-### Shop
+### Fortress / Shop
 - Repair wall HP up to a max wall HP cap
 - Upgrade fire rate
 - Upgrade arrow damage
+- Upgrade wall level
+- Upgrade keep level
+- Build and upgrade **arrow turrets**
+- Build and upgrade **catapults**
+- Turret and catapult targeting mode controls
 - Buy spike traps
 - Buy fire traps
+- Buy slow traps
+- Tabbed shop UI for fortress / defenses / tactics / traps
+
+### Turrets & Siege Defenses
+- Arrow turrets unlock early and are cheaper than before
+- Turrets auto-target enemies
+- Multiple targeting modes:
+  - closest
+  - strongest
+  - fastest
+  - grouped
+- Turret combat polish:
+  - muzzle flash
+  - tracer lines
+  - impact sparks
+  - hover-only range preview in shop
+  - distinct turret firing sound
+- Catapult support weapon with splash damage
 
 ### Traps
-- Swap selected trap type with **Q** or **Tab**
-- Place traps near trap slots in the back area
+- Auto-deploy to random open battlefield trap points when bought
 - **Spike traps** kill a single nearby enemy
 - **Fire traps** damage groups in an area
+- **Slow traps** slow and chip enemies in an area
 - Triggered traps are consumed
-- Trap slot highlight appears when standing near a valid slot
+- Trap coverage indicators update with fortress progression
 
-### Combat / Feedback
+### Combat / Feedback / Audio
 - Arrow glow polish
 - Arrow trail and impact flash
+- Floating combat text
 - Enemy hit flash
 - Enemy death fade
-- Visual differences for fast / tank / armored enemies
+- Visual differences for enemy variants
 - Shadows under player/enemies
 - Wall-hit feedback and camera shake
-- Procedural placeholder sound effects for combat, traps, shop, and wave flow
+- Procedural placeholder sound effects for combat, traps, shop, waves, and turrets
+- Generated background music with separate music volume control
 
-### Game Flow
+### Game Flow / Menus
 - Main menu
 - Pause menu
 - Game over screen
 - Restart flow
+- Options menu
+- Saved settings via `user://settings.cfg`
+- Basic keyboard, mouse, and gamepad menu support
 
 ---
 
@@ -94,9 +133,16 @@ The current version is structured around two connected spaces:
 - **W / Up** → move up in back area / climb up ladder
 - **S / Down** → move down in back area / climb down ladder during prep
 - **Left Mouse Click** or **Space** → shoot
-- **E** → interact with shop / place trap near a trap slot during prep
-- **Q** or **Tab** → swap selected trap type
-- **Esc** → pause
+- **E** → interact with shop during prep
+- **Esc** → pause / close menus
+- **F11** → toggle fullscreen
+
+### Gamepad
+- **D-Pad** → move / menu navigation
+- **A** → interact / accept
+- **B** → cancel
+- **X** → shoot
+- **Start** → pause
 
 ### Ladder Rules
 - Start in the **back area**
@@ -128,8 +174,15 @@ The current version is structured around two connected spaces:
 - **Repair Wall**
 - **Fire Rate Upgrade**
 - **Arrow Damage Upgrade**
+- **Wall Upgrade**
+- **Keep Upgrade**
+- **Arrow Turret**
+- **Turret Target Mode**
+- **Catapult**
+- **Catapult Target Mode**
 - **Spike Trap**
 - **Fire Trap**
+- **Slow Trap**
 
 ---
 
@@ -158,16 +211,19 @@ Main scene:
 - `scenes/Level.tscn` → main playable scene
 
 ### Core scripts
-- `scripts/level.gd` → game phases, waves, camera flow, shop, traps, HUD, menus
+- `scripts/level.gd` → game phases, waves, camera flow, fortress systems, shop, traps, HUD, menus, audio, options
 - `scripts/player.gd` → player movement, ladder-ready movement states, aiming, shooting, animations
 - `scripts/enemy.gd` → enemy movement, HP, hit/death reactions, wall pressure
 - `scripts/arrow.gd` → arrow movement, damage, collision, visual glow
+- `scripts/floating_text.gd` → floating combat text feedback
+- `scripts/options_panel.gd` → reusable options/settings UI logic
 
 ### Scenes
 - `scenes/Player.tscn`
 - `scenes/Enemy.tscn`
 - `scenes/Arrow.tscn`
 - `scenes/Level.tscn`
+- `scenes/OptionsPanel.tscn`
 
 ### Docs
 - `GEMINI.md` → project handover / technical summary
@@ -185,23 +241,26 @@ Implemented now:
 - score tracking
 - wave UI banners
 - interaction prompts and temporary message UI
-- expanded shop
-- spike + fire trap purchase and placement
-- trap selection swapping
-- trap triggering
+- expanded tabbed shop
+- wall / keep progression
+- arrow turrets and catapult defenses
+- spike / fire / slow traps
+- trap triggering and coverage indicators
 - mixed enemy wave composition
-- fast / tank / armored enemy variants
+- runner / ranged / tank / shield / armored / boss variants
 - camera transitions
-- wall-hit feedback
-- procedural placeholder audio pass
-- visual polish pass for level and combat feel
+- responsive widescreen/fullscreen support
+- options menu with saved settings
+- keyboard / mouse / basic gamepad support
+- generated music + placeholder SFX
+- combat polish pass including floating text and turret effects
 
 Still good next targets:
-- real audio assets to replace placeholder generated sounds
-- more enemy behaviors beyond stats
-- more trap variety
-- support archers / allied defenders
-- stronger wall/tower art replacement
+- replace generated audio with authored assets
+- split `level.gd` into smaller systems
+- stronger enemy behaviors beyond stat variation
+- more fortress defenses and trap variety
+- stronger custom art pass for towers / wall / UI
 
 ---
 

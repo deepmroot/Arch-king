@@ -3,6 +3,7 @@ extends Node2D
 const ENEMY_SCENE := preload("res://scenes/Enemy.tscn")
 const ARROW_SCENE := preload("res://scenes/Arrow.tscn")
 const FLOATING_TEXT_SCRIPT := preload("res://scripts/floating_text.gd")
+const OPTIONS_PANEL_SCENE := preload("res://scenes/OptionsPanel.tscn")
 
 const PHASE_PREP := "prep"
 const PHASE_BATTLE := "battle"
@@ -25,6 +26,13 @@ const SHOP_TAB_DEFENSES := "defenses"
 const SHOP_TAB_TACTICS := "tactics"
 const SHOP_TAB_TRAPS := "traps"
 
+const BASE_VIEWPORT_WIDTH := 1152.0
+const BASE_VIEWPORT_HEIGHT := 900.0
+const BASE_CENTER_X := BASE_VIEWPORT_WIDTH * 0.5
+const BASE_PATH_WIDTH := 300.0
+const BASE_RIGHT_TOWER_WIDTH := 170.0
+const SETTINGS_PATH := "user://settings.cfg"
+
 @export var starting_hp := 10
 @export var max_castle_hp := 15
 @export var wall_y := 90.0
@@ -37,7 +45,7 @@ const SHOP_TAB_TRAPS := "traps"
 @export var damage_upgrade_cost := 10
 @export var wall_upgrade_cost := 12
 @export var keep_upgrade_cost := 18
-@export var turret_build_cost := 24
+@export var turret_build_cost := 16
 @export var catapult_build_cost := 34
 @export var enemy_lane_half_width := 120.0
 @export var player_wall_offset := -24.0
@@ -71,6 +79,8 @@ var turret_fire_timer := 0.0
 var turret_range := 240.0
 var turret_positions: Array[Vector2] = [Vector2(500, 432), Vector2(652, 432)]
 var turret_visuals: Array[Polygon2D] = []
+var turret_range_indicators: Array[Line2D] = []
+var turret_preview_hovered := false
 var turret_target_mode := TARGET_CLOSEST
 var catapult_level := 0
 var catapult_fire_timer := 0.0
@@ -102,18 +112,40 @@ var audio_players: Array[AudioStreamPlayer] = []
 var boss_reward_pending := false
 var trap_coverage_indicators: Array[Polygon2D] = []
 var current_shop_tab := SHOP_TAB_FORTRESS
+var master_volume := 1.0
+var music_volume := 0.6
+var sfx_volume := 1.0
+var display_mode := "fullscreen"
+var resolution_scale := 1.0
+var options_panel
+var music_player: AudioStreamPlayer
+var music_step_time := 0.0
+var music_step_index := 0
+var music_melody := [261.63, 329.63, 392.0, 329.63, 293.66, 349.23, 440.0, 349.23]
+var music_bass := [130.81, 0.0, 146.83, 0.0, 164.81, 0.0, 146.83, 0.0]
 
 @onready var player = $Player
 @onready var enemies_container = $Enemies
 @onready var projectiles_container = $Projectiles
 @onready var enemy_spawner: Timer = $EnemySpawner
+@onready var background_forest: TextureRect = $Background/ForestBackground
+@onready var background_path: TextureRect = $Background/Path
+@onready var support_area: Polygon2D = $SupportArea
+@onready var back_yard_boundary: Polygon2D = $BackYardBoundary
+@onready var wall_front_shadow: Polygon2D = $WallFrontShadow
 @onready var shop_zone: Area2D = $ShopZone
 @onready var castle_wall_band: Polygon2D = $CastleWallBand
 @onready var wall_highlight: Polygon2D = $WallHighlight
 @onready var wall_mid_shadow: Polygon2D = $WallMidShadow
 @onready var gate_arch: Sprite2D = $GateArch
+@onready var ladder: Node2D = $Ladder
 @onready var wall_battlements: Node2D = $WallBattlements
 @onready var towers: Node2D = $Towers
+@onready var right_tower: Polygon2D = $Towers/RightTower
+@onready var right_tower_cap: Polygon2D = $Towers/RightTowerCap
+@onready var right_tower_highlight: Polygon2D = $Towers/RightTowerHighlight
+@onready var right_tower_window: Polygon2D = $Towers/RightTowerWindow
+@onready var right_tower_window_glow: Polygon2D = $Towers/RightTowerWindowGlow
 @onready var lane_marker: Marker2D = $LayoutMarkers/EnemyLaneCenter
 @onready var shop_marker: Marker2D = $LayoutMarkers/ShopMarker
 @onready var wall_camera_focus: Marker2D = $LayoutMarkers/WallCameraFocus
@@ -166,8 +198,10 @@ var current_shop_tab := SHOP_TAB_FORTRESS
 @onready var slow_trap_button: Button = $UI/ShopPanel/VBoxContainer/SlowTrapButton
 @onready var close_button: Button = $UI/ShopPanel/VBoxContainer/CloseButton
 @onready var main_menu_panel: Panel = $UI/MainMenuPanel
+@onready var main_menu_vbox: VBoxContainer = $UI/MainMenuPanel/VBox
 @onready var start_button: Button = $UI/MainMenuPanel/VBox/StartButton
 @onready var pause_panel: Panel = $UI/PausePanel
+@onready var pause_vbox: VBoxContainer = $UI/PausePanel/VBox
 @onready var resume_button: Button = $UI/PausePanel/VBox/ResumeButton
 @onready var game_over_panel: Panel = $UI/GameOverPanel
 @onready var restart_button: Button = $UI/GameOverPanel/VBox/RestartButton
@@ -178,29 +212,18 @@ func _ready() -> void:
 	randomize()
 	_setup_input_actions()
 	_setup_audio()
+	_setup_music()
+	_build_options_ui()
+	_load_settings()
 
 	castle_hp = starting_hp
-	var viewport_size: Vector2 = get_viewport_rect().size
 	wall_y = 470.0
 
-	player.wall_y = wall_y + player_wall_offset
-	player.left_bound = 170.0
-	player.right_bound = viewport_size.x - 170.0
-	player.set_free_move_bounds(80.0, viewport_size.x - 80.0, lower_area_top_y, lower_area_bottom_y)
+	get_viewport().size_changed.connect(_update_responsive_layout)
+	_update_responsive_layout()
 	player.global_position = Vector2(ladder_bottom_zone.global_position.x, lower_lane_y)
 	player.shoot_requested.connect(_on_player_shoot_requested)
 	_apply_player_upgrades()
-
-	shop_zone.global_position = shop_marker.global_position
-	game_camera.global_position = back_area_camera_focus.global_position
-	var wall_top := wall_y
-	var wall_bottom := wall_y + 70.0
-	castle_wall_band.polygon = PackedVector2Array([
-		Vector2(0.0, wall_top),
-		Vector2(viewport_size.x, wall_top),
-		Vector2(viewport_size.x, wall_bottom),
-		Vector2(0.0, wall_bottom)
-	])
 
 	enemy_spawner.timeout.connect(_on_enemy_spawner_timeout)
 	shop_zone.body_entered.connect(_on_shop_zone_body_entered)
@@ -220,7 +243,11 @@ func _ready() -> void:
 	wall_upgrade_button.mouse_entered.connect(func(): _show_wall_upgrade_info())
 	keep_upgrade_button.mouse_entered.connect(func(): _show_keep_upgrade_info())
 	turret_button.mouse_entered.connect(func(): _show_turret_info())
+	turret_button.mouse_entered.connect(func(): _set_turret_preview_hovered(true))
+	turret_button.mouse_exited.connect(func(): _set_turret_preview_hovered(false))
 	turret_mode_button.mouse_entered.connect(func(): _show_turret_tactics_info())
+	turret_mode_button.mouse_entered.connect(func(): _set_turret_preview_hovered(true))
+	turret_mode_button.mouse_exited.connect(func(): _set_turret_preview_hovered(false))
 	catapult_button.mouse_entered.connect(func(): _show_catapult_info())
 	catapult_mode_button.mouse_entered.connect(func(): _show_catapult_tactics_info())
 	trap_button.mouse_entered.connect(func(): _show_spike_trap_info())
@@ -252,6 +279,8 @@ func _ready() -> void:
 	game_over_panel.visible = false
 	pause_panel.visible = false
 	main_menu_panel.visible = true
+	if options_panel != null:
+		options_panel.visible = false
 	message_label.visible = false
 	prompt_label.text = ""
 	_refresh_shop_buttons()
@@ -264,7 +293,130 @@ func _ready() -> void:
 	get_tree().paused = true
 
 
+func _update_responsive_layout() -> void:
+	var viewport_size := get_viewport_rect().size
+	var center_x := viewport_size.x * 0.5
+	var right_edge := viewport_size.x
+	var right_tower_left := right_edge - BASE_RIGHT_TOWER_WIDTH
+
+	background_forest.offset_right = right_edge
+	background_forest.offset_bottom = 648.0
+	background_path.offset_left = center_x - BASE_PATH_WIDTH * 0.5
+	background_path.offset_right = center_x + BASE_PATH_WIDTH * 0.5
+	background_path.offset_bottom = 648.0
+
+	support_area.polygon = PackedVector2Array([
+		Vector2(0.0, 540.0),
+		Vector2(right_edge, 540.0),
+		Vector2(right_edge, BASE_VIEWPORT_HEIGHT),
+		Vector2(0.0, BASE_VIEWPORT_HEIGHT)
+	])
+	back_yard_boundary.polygon = PackedVector2Array([
+		Vector2(0.0, 840.0),
+		Vector2(right_edge, 840.0),
+		Vector2(right_edge, BASE_VIEWPORT_HEIGHT),
+		Vector2(0.0, BASE_VIEWPORT_HEIGHT)
+	])
+	wall_front_shadow.polygon = PackedVector2Array([
+		Vector2(0.0, 540.0),
+		Vector2(right_edge, 540.0),
+		Vector2(right_edge, 566.0),
+		Vector2(0.0, 566.0)
+	])
+	castle_wall_band.polygon = PackedVector2Array([
+		Vector2(0.0, wall_y),
+		Vector2(right_edge, wall_y),
+		Vector2(right_edge, wall_y + 70.0),
+		Vector2(0.0, wall_y + 70.0)
+	])
+	wall_highlight.polygon = PackedVector2Array([
+		Vector2(0.0, 470.0),
+		Vector2(right_edge, 470.0),
+		Vector2(right_edge, 490.0),
+		Vector2(0.0, 490.0)
+	])
+	wall_mid_shadow.polygon = PackedVector2Array([
+		Vector2(0.0, 500.0),
+		Vector2(right_edge, 500.0),
+		Vector2(right_edge, 520.0),
+		Vector2(0.0, 520.0)
+	])
+
+	lane_marker.position.x = center_x
+	wall_camera_focus.position.x = center_x
+	back_area_camera_focus.position.x = center_x
+	gate_arch.position.x = center_x
+	ladder.position.x = center_x
+	ladder_top_zone.position.x = center_x
+	ladder_bottom_zone.position.x = center_x
+	wall_battlements.scale.x = right_edge / BASE_VIEWPORT_WIDTH
+
+	right_tower.polygon = PackedVector2Array([
+		Vector2(right_tower_left, 180.0),
+		Vector2(right_edge, 180.0),
+		Vector2(right_edge, BASE_VIEWPORT_HEIGHT),
+		Vector2(right_tower_left, BASE_VIEWPORT_HEIGHT)
+	])
+	right_tower_cap.polygon = PackedVector2Array([
+		Vector2(right_tower_left, 160.0),
+		Vector2(right_edge, 160.0),
+		Vector2(right_edge, 210.0),
+		Vector2(right_tower_left, 210.0)
+	])
+	right_tower_highlight.polygon = PackedVector2Array([
+		Vector2(right_tower_left + 18.0, 190.0),
+		Vector2(right_tower_left + 62.0, 190.0),
+		Vector2(right_tower_left + 62.0, BASE_VIEWPORT_HEIGHT),
+		Vector2(right_tower_left + 18.0, BASE_VIEWPORT_HEIGHT)
+	])
+	right_tower_window.polygon = PackedVector2Array([
+		Vector2(right_tower_left + 86.0, 620.0),
+		Vector2(right_tower_left + 126.0, 620.0),
+		Vector2(right_tower_left + 126.0, 698.0),
+		Vector2(right_tower_left + 86.0, 698.0)
+	])
+	right_tower_window_glow.polygon = PackedVector2Array([
+		Vector2(right_tower_left + 92.0, 632.0),
+		Vector2(right_tower_left + 120.0, 632.0),
+		Vector2(right_tower_left + 120.0, 686.0),
+		Vector2(right_tower_left + 92.0, 686.0)
+	])
+
+	player.wall_y = wall_y + player_wall_offset
+	player.left_bound = 170.0
+	player.right_bound = viewport_size.x - 170.0
+	if player_is_on_lower_lane:
+		player.set_free_move_bounds(80.0, viewport_size.x - 80.0, lower_area_top_y, lower_area_bottom_y)
+	else:
+		player.set_lane(player.wall_y, 170.0, viewport_size.x - 170.0)
+	player.global_position.x = clamp(player.global_position.x, player.left_bound, player.right_bound)
+
+	shop_zone.global_position = shop_marker.global_position
+	game_camera.limit_right = int(right_edge)
+	game_camera.limit_bottom = int(BASE_VIEWPORT_HEIGHT)
+	if not is_ladder_transitioning:
+		game_camera.global_position = back_area_camera_focus.global_position if player_is_on_lower_lane else wall_camera_focus.global_position
+
+	_set_centered_control_rect(prompt_label, 820.0, min(652.0, viewport_size.x - 80.0), 36.0)
+	_set_centered_control_rect(message_label, 120.0, min(600.0, viewport_size.x - 80.0), 34.0)
+	_set_centered_control_rect(boss_bar_panel, 10.0, min(600.0, viewport_size.x - 120.0), 40.0)
+	_set_centered_control_rect(wave_banner, 52.0, min(520.0, viewport_size.x - 120.0), 66.0)
+	_set_centered_control_rect(boss_reward_panel, 170.0, 420.0, 220.0)
+	_set_centered_control_rect(shop_panel, 62.0, 516.0, 586.0)
+	_set_centered_control_rect(main_menu_panel, 180.0, 320.0, 210.0)
+	_set_centered_control_rect(pause_panel, 180.0, 320.0, 210.0)
+	_set_centered_control_rect(game_over_panel, 200.0, 300.0, 150.0)
+	if options_panel != null:
+		_set_centered_control_rect(options_panel, 150.0, 380.0, 260.0)
+
+
+func _set_centered_control_rect(control: Control, y: float, width: float, height: float) -> void:
+	control.position = Vector2(get_viewport_rect().size.x * 0.5 - width * 0.5, y)
+	control.size = Vector2(width, height)
+
+
 func _process(delta: float) -> void:
+	_update_music(delta)
 	if get_tree().paused or is_game_over:
 		return
 
@@ -303,6 +455,8 @@ func _process(delta: float) -> void:
 
 func _start_game() -> void:
 	main_menu_panel.visible = false
+	if options_panel != null:
+		options_panel.visible = false
 	get_tree().paused = false
 	battle_started = false
 	_start_prep_phase()
@@ -320,16 +474,25 @@ func _toggle_pause() -> void:
 	var is_paused := not get_tree().paused
 	get_tree().paused = is_paused
 	pause_panel.visible = is_paused
+	if not is_paused and options_panel != null:
+		options_panel.visible = false
 
 
 func _setup_input_actions() -> void:
-	_ensure_action("move_left", [_make_key_event(KEY_A), _make_key_event(KEY_LEFT)])
-	_ensure_action("move_right", [_make_key_event(KEY_D), _make_key_event(KEY_RIGHT)])
-	_ensure_action("move_up", [_make_key_event(KEY_W), _make_key_event(KEY_UP)])
-	_ensure_action("move_down", [_make_key_event(KEY_S), _make_key_event(KEY_DOWN)])
-	_ensure_action("shoot", [_make_key_event(KEY_SPACE), _make_mouse_event(MOUSE_BUTTON_LEFT)])
-	_ensure_action("interact", [_make_key_event(KEY_E)])
-	_ensure_action("pause", [_make_key_event(KEY_ESCAPE)])
+	_ensure_action("move_left", [_make_key_event(KEY_A), _make_key_event(KEY_LEFT), _make_joy_button_event(JOY_BUTTON_DPAD_LEFT)])
+	_ensure_action("move_right", [_make_key_event(KEY_D), _make_key_event(KEY_RIGHT), _make_joy_button_event(JOY_BUTTON_DPAD_RIGHT)])
+	_ensure_action("move_up", [_make_key_event(KEY_W), _make_key_event(KEY_UP), _make_joy_button_event(JOY_BUTTON_DPAD_UP)])
+	_ensure_action("move_down", [_make_key_event(KEY_S), _make_key_event(KEY_DOWN), _make_joy_button_event(JOY_BUTTON_DPAD_DOWN)])
+	_ensure_action("shoot", [_make_key_event(KEY_SPACE), _make_mouse_event(MOUSE_BUTTON_LEFT), _make_joy_button_event(JOY_BUTTON_X)])
+	_ensure_action("interact", [_make_key_event(KEY_E), _make_joy_button_event(JOY_BUTTON_A)])
+	_ensure_action("pause", [_make_key_event(KEY_ESCAPE), _make_joy_button_event(JOY_BUTTON_START)])
+	_ensure_action("toggle_fullscreen", [_make_key_event(KEY_F11)])
+	_ensure_action("ui_accept", [_make_key_event(KEY_ENTER), _make_joy_button_event(JOY_BUTTON_A)])
+	_ensure_action("ui_cancel", [_make_key_event(KEY_ESCAPE), _make_joy_button_event(JOY_BUTTON_B), _make_joy_button_event(JOY_BUTTON_START)])
+	_ensure_action("ui_left", [_make_key_event(KEY_LEFT), _make_joy_button_event(JOY_BUTTON_DPAD_LEFT)])
+	_ensure_action("ui_right", [_make_key_event(KEY_RIGHT), _make_joy_button_event(JOY_BUTTON_DPAD_RIGHT)])
+	_ensure_action("ui_up", [_make_key_event(KEY_UP), _make_joy_button_event(JOY_BUTTON_DPAD_UP)])
+	_ensure_action("ui_down", [_make_key_event(KEY_DOWN), _make_joy_button_event(JOY_BUTTON_DPAD_DOWN)])
 
 
 func _ensure_action(action_name: String, events: Array) -> void:
@@ -354,6 +517,12 @@ func _make_mouse_event(button: MouseButton) -> InputEventMouseButton:
 	return event
 
 
+func _make_joy_button_event(button_index: JoyButton) -> InputEventJoypadButton:
+	var event := InputEventJoypadButton.new()
+	event.button_index = button_index
+	return event
+
+
 func _start_prep_phase() -> void:
 	current_phase = PHASE_PREP
 	prep_time_remaining = prep_phase_duration
@@ -361,6 +530,7 @@ func _start_prep_phase() -> void:
 	enemies_to_spawn = 0
 	enemy_spawner.stop()
 	_refresh_shop_buttons()
+	_update_turret_visual()
 	_update_hud()
 
 
@@ -368,11 +538,13 @@ func _begin_next_wave() -> void:
 	if current_phase == PHASE_BATTLE:
 		return
 
+	turret_preview_hovered = false
 	current_phase = PHASE_BATTLE
 	wave_index += 1
 	enemy_spawn_queue = _build_wave_queue(wave_index)
 	enemies_to_spawn = enemy_spawn_queue.size()
 	_refresh_shop_buttons()
+	_update_turret_visual()
 	_show_wave_banner("Boss Wave %d" % wave_index if wave_index % 5 == 0 else "Wave %d Start" % wave_index)
 	_play_sound("wave_start")
 	_set_status_message(_get_wave_hint(wave_index), 1.6)
@@ -745,6 +917,18 @@ func _on_ladder_bottom_zone_body_exited(body: Node2D) -> void:
 
 
 func _unhandled_input(event: InputEvent) -> void:
+	if InputMap.has_action("toggle_fullscreen") and event.is_action_pressed("toggle_fullscreen"):
+		display_mode = "windowed" if display_mode == "fullscreen" else "fullscreen"
+		_apply_settings()
+		_save_settings()
+		get_viewport().set_input_as_handled()
+		return
+
+	if options_panel != null and options_panel.visible and InputMap.has_action("pause") and event.is_action_pressed("pause"):
+		_close_options()
+		get_viewport().set_input_as_handled()
+		return
+
 	if main_menu_panel.visible:
 		return
 
@@ -786,6 +970,7 @@ func _open_shop() -> void:
 	message_label.visible = false
 	current_shop_tab = SHOP_TAB_FORTRESS
 	_refresh_shop_buttons()
+	_update_turret_visual()
 	_update_shop_tab_visibility()
 	_update_shop_tab_info()
 	shop_message_label.text = ""
@@ -868,6 +1053,8 @@ func _close_shop() -> void:
 	shop_panel.visible = false
 	hud_root.modulate = Color(1, 1, 1, 1)
 	prompt_label.visible = true
+	turret_preview_hovered = false
+	_update_turret_visual()
 	_play_sound("shop_close")
 
 	if not is_game_over:
@@ -878,6 +1065,7 @@ func _set_shop_tab(tab_name: String) -> void:
 	current_shop_tab = tab_name
 	_update_shop_tab_visibility()
 	_update_shop_tab_info()
+	_update_turret_visual()
 	_play_sound("shop_open")
 
 
@@ -1006,10 +1194,10 @@ func _buy_keep_upgrade() -> void:
 
 
 func _buy_or_upgrade_turret() -> void:
-	if keep_level < 2:
+	if keep_level < 1:
 		return
 	turret_level += 1
-	turret_range = 240.0 + float(turret_level - 1) * 22.0
+	turret_range = 280.0 + float(turret_level - 1) * 28.0
 	_update_turret_visual()
 	_update_castle_visuals()
 
@@ -1244,7 +1432,11 @@ func _build_turret_visual() -> void:
 	for visual in turret_visuals:
 		if is_instance_valid(visual):
 			visual.queue_free()
+	for indicator in turret_range_indicators:
+		if is_instance_valid(indicator):
+			indicator.queue_free()
 	turret_visuals.clear()
+	turret_range_indicators.clear()
 
 	for turret_position in turret_positions:
 		var turret_visual: Polygon2D = Polygon2D.new()
@@ -1259,6 +1451,16 @@ func _build_turret_visual() -> void:
 		])
 		add_child(turret_visual)
 		turret_visuals.append(turret_visual)
+
+		var indicator: Line2D = Line2D.new()
+		indicator.z_index = 6
+		indicator.visible = false
+		indicator.width = 2.0
+		indicator.default_color = Color(1.0, 0.86, 0.45, 0.18)
+		indicator.closed = true
+		indicator.position = turret_position
+		add_child(indicator)
+		turret_range_indicators.append(indicator)
 	_update_turret_visual()
 
 
@@ -1323,10 +1525,68 @@ func _update_castle_visuals() -> void:
 	_update_catapult_visual()
 
 
+func _build_circle_points(radius: float, segments: int = 32) -> PackedVector2Array:
+	var points := PackedVector2Array()
+	for i in range(segments):
+		var angle: float = TAU * float(i) / float(segments)
+		points.append(Vector2(cos(angle), sin(angle)) * radius)
+	return points
+
+
+func _set_turret_preview_hovered(is_hovered: bool) -> void:
+	turret_preview_hovered = is_hovered
+	_update_turret_visual()
+
+
+func _spawn_turret_tracer(origin: Vector2, target: Vector2) -> void:
+	var tracer: Line2D = Line2D.new()
+	tracer.z_index = 18
+	tracer.width = 3.0
+	tracer.default_color = Color(1.0, 0.9, 0.55, 0.9)
+	tracer.points = PackedVector2Array([origin, target])
+	add_child(tracer)
+	var tween: Tween = tracer.create_tween()
+	tween.parallel().tween_property(tracer, "modulate", Color(1, 1, 1, 0), 0.12)
+	tween.parallel().tween_property(tracer, "width", 1.0, 0.12)
+	tween.tween_callback(tracer.queue_free)
+
+
+func _spawn_turret_muzzle_flash(origin: Vector2) -> void:
+	var flash: Polygon2D = Polygon2D.new()
+	flash.z_index = 19
+	flash.position = origin
+	flash.color = Color(1.0, 0.92, 0.65, 0.95)
+	flash.polygon = PackedVector2Array([
+		Vector2(-6, 0), Vector2(-2, -2), Vector2(0, -8), Vector2(2, -2),
+		Vector2(8, 0), Vector2(2, 2), Vector2(0, 8), Vector2(-2, 2)
+	])
+	add_child(flash)
+	var tween: Tween = flash.create_tween()
+	tween.parallel().tween_property(flash, "scale", Vector2(2.0, 2.0), 0.1)
+	tween.parallel().tween_property(flash, "modulate", Color(1, 1, 1, 0), 0.1)
+	tween.tween_callback(flash.queue_free)
+
+
+func _spawn_turret_impact_sparks(position: Vector2) -> void:
+	var sparks: Polygon2D = Polygon2D.new()
+	sparks.z_index = 19
+	sparks.position = position
+	sparks.color = Color(1.0, 0.82, 0.38, 0.95)
+	sparks.polygon = PackedVector2Array([
+		Vector2(-10, 0), Vector2(-3, -3), Vector2(0, -11), Vector2(3, -3),
+		Vector2(10, 0), Vector2(3, 3), Vector2(0, 11), Vector2(-3, 3)
+	])
+	add_child(sparks)
+	var tween: Tween = sparks.create_tween()
+	tween.parallel().tween_property(sparks, "scale", Vector2(1.8, 1.8), 0.12)
+	tween.parallel().tween_property(sparks, "modulate", Color(1, 1, 1, 0), 0.12)
+	tween.tween_callback(sparks.queue_free)
+
+
 func _get_active_turret_count() -> int:
 	if turret_level <= 0:
 		return 0
-	if keep_level >= 3 and wall_level >= 2 and turret_level >= 2:
+	if keep_level >= 2 and turret_level >= 2:
 		return min(2, turret_positions.size())
 	return 1
 
@@ -1336,16 +1596,27 @@ func _update_turret_visual() -> void:
 		return
 
 	var active_count := _get_active_turret_count()
+	var show_range_preview: bool = current_phase == PHASE_PREP and shop_panel.visible and turret_preview_hovered
 	for i in range(turret_visuals.size()):
 		var turret_visual := turret_visuals[i]
 		if not is_instance_valid(turret_visual):
 			continue
 		turret_visual.visible = i < active_count
 		if i >= active_count:
+			if i < turret_range_indicators.size() and is_instance_valid(turret_range_indicators[i]):
+				turret_range_indicators[i].visible = false
 			continue
-		turret_visual.position = turret_positions[i] + Vector2(0, -float(max(wall_level - 1, 0)) * 4.0)
-		turret_visual.scale = Vector2.ONE * (1.0 + float(turret_level - 1) * 0.08)
-		turret_visual.color = Color(0.82 + min(float(turret_level) * 0.03, 0.12), 0.74 + min(float(keep_level - 1) * 0.02, 0.08), 0.58, 0.98)
+		var mount_position: Vector2 = turret_positions[i] + Vector2(0, -float(max(wall_level - 1, 0)) * 4.0)
+		turret_visual.position = mount_position
+		turret_visual.rotation = lerp_angle(turret_visual.rotation, 0.0, 0.18)
+		turret_visual.scale = Vector2.ONE * (1.2 + float(turret_level - 1) * 0.12)
+		turret_visual.color = Color(0.9 + min(float(turret_level) * 0.03, 0.1), 0.82 + min(float(keep_level - 1) * 0.03, 0.1), 0.5, 1.0)
+		if i < turret_range_indicators.size() and is_instance_valid(turret_range_indicators[i]):
+			var indicator: Line2D = turret_range_indicators[i]
+			indicator.position = mount_position
+			indicator.visible = show_range_preview
+			indicator.points = _build_circle_points(turret_range, 40)
+			indicator.default_color = Color(1.0, 0.86, 0.45, 0.18 + min(float(turret_level) * 0.03, 0.08))
 
 
 func _update_catapult_visual() -> void:
@@ -1441,20 +1712,28 @@ func _update_turret_attack() -> void:
 		var arrow = ARROW_SCENE.instantiate()
 		arrow.global_position = mount_position + Vector2(0, -10)
 		if arrow.has_method("set_damage"):
-			arrow.set_damage(1 + turret_level)
+			arrow.set_damage(2 + turret_level)
 		projectiles_container.add_child(arrow)
 		if arrow.has_method("set_direction"):
 			arrow.set_direction(target.global_position)
+		_spawn_turret_tracer(mount_position + Vector2(0, -10), target.global_position)
+		_spawn_turret_muzzle_flash(mount_position + Vector2(0, -10))
+		_spawn_turret_impact_sparks(target.global_position)
 		fired = true
-		_play_sound("shoot")
+		_play_sound("turret_shoot")
 		if i < turret_visuals.size() and is_instance_valid(turret_visuals[i]):
 			var turret_visual := turret_visuals[i]
-			turret_visual.scale = Vector2.ONE * (1.1 + float(turret_level - 1) * 0.08)
+			var aim_angle: float = (target.global_position - mount_position).angle() + PI * 0.5
+			turret_visual.rotation = aim_angle
+			turret_visual.scale = Vector2.ONE * (1.35 + float(turret_level - 1) * 0.14)
+			turret_visual.modulate = Color(1.3, 1.15, 0.8, 1.0)
 			var tween: Tween = turret_visual.create_tween()
-			tween.tween_property(turret_visual, "scale", Vector2.ONE * (1.0 + float(turret_level - 1) * 0.08), 0.12)
+			tween.parallel().tween_property(turret_visual, "scale", Vector2.ONE * (1.2 + float(turret_level - 1) * 0.12), 0.12)
+			tween.parallel().tween_property(turret_visual, "modulate", Color(1, 1, 1, 1), 0.16)
+			tween.parallel().tween_property(turret_visual, "rotation", 0.0, 0.18)
 
 	if fired:
-		turret_fire_timer = max(0.25, 0.95 - float(turret_level - 1) * 0.08)
+		turret_fire_timer = max(0.2, 0.75 - float(turret_level - 1) * 0.07)
 
 
 func _update_catapult_attack() -> void:
@@ -1574,6 +1853,123 @@ func _setup_audio() -> void:
 		audio_players.append(player_node)
 
 
+func _setup_music() -> void:
+	music_player = AudioStreamPlayer.new()
+	var generator := AudioStreamGenerator.new()
+	generator.mix_rate = 44100.0
+	generator.buffer_length = 0.4
+	music_player.stream = generator
+	music_player.bus = "Master"
+	add_child(music_player)
+
+
+func _build_options_ui() -> void:
+	var main_menu_options_button := Button.new()
+	main_menu_options_button.text = "Options"
+	main_menu_options_button.focus_mode = Control.FOCUS_ALL
+	main_menu_options_button.pressed.connect(_toggle_options)
+	main_menu_vbox.add_child(main_menu_options_button)
+
+	var pause_options_button := Button.new()
+	pause_options_button.text = "Options"
+	pause_options_button.focus_mode = Control.FOCUS_ALL
+	pause_options_button.pressed.connect(_toggle_options)
+	pause_vbox.add_child(pause_options_button)
+
+	options_panel = OPTIONS_PANEL_SCENE.instantiate()
+	options_panel.process_mode = Node.PROCESS_MODE_ALWAYS
+	$UI.add_child(options_panel)
+	options_panel.close_requested.connect(_close_options)
+	options_panel.settings_changed.connect(_on_options_settings_changed)
+
+
+func _toggle_options() -> void:
+	if options_panel == null:
+		return
+	var should_show: bool = not options_panel.visible
+	options_panel.visible = should_show
+	if should_show:
+		options_panel.apply_settings(_get_settings_dictionary())
+		options_panel.focus_default()
+
+
+func _close_options() -> void:
+	if options_panel == null:
+		return
+	options_panel.visible = false
+
+
+func _get_settings_dictionary() -> Dictionary:
+	return {
+		"display_mode": display_mode,
+		"resolution_scale": resolution_scale,
+		"master_volume": master_volume,
+		"music_volume": music_volume,
+		"sfx_volume": sfx_volume,
+	}
+
+
+func _load_settings() -> void:
+	var config := ConfigFile.new()
+	var err := config.load(SETTINGS_PATH)
+	if err == OK:
+		master_volume = float(config.get_value("audio", "master_volume", 1.0))
+		music_volume = float(config.get_value("audio", "music_volume", 0.6))
+		sfx_volume = float(config.get_value("audio", "sfx_volume", 1.0))
+		display_mode = str(config.get_value("video", "display_mode", "fullscreen"))
+		resolution_scale = float(config.get_value("video", "resolution_scale", 1.0))
+	else:
+		display_mode = "fullscreen"
+		resolution_scale = 1.0
+
+	_apply_settings()
+
+
+func _save_settings() -> void:
+	var config := ConfigFile.new()
+	config.set_value("audio", "master_volume", master_volume)
+	config.set_value("audio", "music_volume", music_volume)
+	config.set_value("audio", "sfx_volume", sfx_volume)
+	config.set_value("video", "display_mode", display_mode)
+	config.set_value("video", "resolution_scale", resolution_scale)
+	config.save(SETTINGS_PATH)
+
+
+func _apply_settings() -> void:
+	master_volume = clamp(master_volume, 0.0, 1.0)
+	music_volume = clamp(music_volume, 0.0, 1.0)
+	sfx_volume = clamp(sfx_volume, 0.0, 1.0)
+	resolution_scale = clamp(resolution_scale, 0.75, 1.5)
+
+	DisplayServer.window_set_flag(DisplayServer.WINDOW_FLAG_BORDERLESS, false)
+	match display_mode:
+		"borderless":
+			DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_MAXIMIZED)
+			DisplayServer.window_set_flag(DisplayServer.WINDOW_FLAG_BORDERLESS, true)
+		"windowed":
+			DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_WINDOWED)
+			DisplayServer.window_set_size(Vector2i(int(BASE_VIEWPORT_WIDTH), int(BASE_VIEWPORT_HEIGHT)))
+		_:
+			display_mode = "fullscreen"
+			DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_FULLSCREEN)
+
+	get_window().content_scale_factor = resolution_scale
+	var master_bus := AudioServer.get_bus_index("Master")
+	AudioServer.set_bus_volume_db(master_bus, linear_to_db(max(master_volume, 0.0001)))
+	if options_panel != null:
+		options_panel.apply_settings(_get_settings_dictionary())
+
+
+func _on_options_settings_changed(settings: Dictionary) -> void:
+	display_mode = str(settings.get("display_mode", display_mode))
+	resolution_scale = float(settings.get("resolution_scale", resolution_scale))
+	master_volume = float(settings.get("master_volume", master_volume))
+	music_volume = float(settings.get("music_volume", music_volume))
+	sfx_volume = float(settings.get("sfx_volume", sfx_volume))
+	_apply_settings()
+	_save_settings()
+
+
 func _play_sound(event_name: String, data: Dictionary = {}) -> void:
 	if audio_players.is_empty():
 		return
@@ -1582,6 +1978,9 @@ func _play_sound(event_name: String, data: Dictionary = {}) -> void:
 		"shoot":
 			_play_tone(0, 760.0 + damage_level * 40.0, 0.045, 0.16, "triangle", 1.0)
 			_play_tone(1, 980.0, 0.03, 0.08, "sine", 0.25)
+		"turret_shoot":
+			_play_tone(0, 610.0 + turret_level * 30.0, 0.05, 0.14, "square", 0.4)
+			_play_tone(1, 820.0, 0.035, 0.06, "triangle", 0.15)
 		"enemy_hit":
 			var hit_pitch: float = 320.0
 			var target_type := str(data.get("target_type", "grunt"))
@@ -1621,11 +2020,33 @@ func _play_sound(event_name: String, data: Dictionary = {}) -> void:
 			_play_tone(1, 659.0, 0.1, 0.09, "sine", 0.0)
 
 
+func _update_music(delta: float) -> void:
+	if music_player == null:
+		return
+
+	music_step_time -= delta
+	if music_step_time > 0.0:
+		return
+
+	music_step_time = 0.42
+	var melody_freq: float = music_melody[music_step_index % music_melody.size()]
+	var bass_freq: float = music_bass[music_step_index % music_bass.size()]
+	if music_volume > 0.0:
+		_play_generated_tone(music_player, melody_freq, 0.34, 0.05, "sine", 0.0, music_volume)
+		if bass_freq > 0.0:
+			_play_generated_tone(music_player, bass_freq, 0.36, 0.035, "triangle", 0.0, music_volume)
+	music_step_index += 1
+
+
 func _play_tone(player_index: int, frequency: float, duration: float, volume: float, waveform: String = "sine", pitch_slide: float = 0.0) -> void:
 	if player_index < 0 or player_index >= audio_players.size():
 		return
+	_play_generated_tone(audio_players[player_index], frequency, duration, volume, waveform, pitch_slide, sfx_volume)
 
-	var player_node := audio_players[player_index]
+
+func _play_generated_tone(player_node: AudioStreamPlayer, frequency: float, duration: float, volume: float, waveform: String, pitch_slide: float, gain: float) -> void:
+	if player_node == null or frequency <= 0.0 or gain <= 0.0:
+		return
 	if not player_node.playing:
 		player_node.play()
 
@@ -1645,7 +2066,7 @@ func _play_tone(player_index: int, frequency: float, duration: float, volume: fl
 		phase += TAU * current_freq / mix_rate
 		var sample := _sample_waveform(waveform, phase)
 		var envelope := 1.0 - t
-		playback.push_frame(Vector2.ONE * sample * volume * envelope)
+		playback.push_frame(Vector2.ONE * sample * volume * gain * envelope)
 	player_node.play()
 
 
@@ -1741,9 +2162,9 @@ func _show_keep_upgrade_info() -> void:
 
 func _show_turret_info() -> void:
 	var mounts_next := 1
-	if keep_level >= 3 and wall_level >= 2 and turret_level + 1 >= 2:
+	if keep_level >= 2 and turret_level + 1 >= 2:
 		mounts_next = 2
-	_set_shop_info("Arrow Turret Lv.%d → %d" % [max(turret_level, 0), max(turret_level + 1, 1)], "Current mounts: %d\nNext mounts: %d\nSingle-target auto defense." % [_get_active_turret_count(), mounts_next])
+	_set_shop_info("Arrow Turret Lv.%d → %d" % [max(turret_level, 0), max(turret_level + 1, 1)], "Current mounts: %d\nNext mounts: %d\nFast auto-defense with long range and stronger shots." % [_get_active_turret_count(), mounts_next])
 
 
 func _show_turret_tactics_info() -> void:
@@ -1788,7 +2209,7 @@ func _refresh_shop_buttons() -> void:
 	damage_button.text = "✦ Arrow Damage Lv.%d (%d)" % [damage_level + 1, _get_damage_upgrade_cost()]
 	wall_upgrade_button.text = "Wall Level %d (%d)" % [wall_level + 1, _get_wall_upgrade_cost()]
 	keep_upgrade_button.text = "Keep Level %d (%d)" % [keep_level + 1, _get_keep_upgrade_cost()]
-	turret_button.text = "Arrow Turret Lv.%d | Mounts %d %s" % [max(turret_level, 1), _get_active_turret_count(), "(%d)" % _get_turret_cost() if keep_level >= 2 else "(Unlock at Keep 2)"]
+	turret_button.text = "Arrow Turret Lv.%d | Mounts %d (%d)" % [max(turret_level, 1), _get_active_turret_count(), _get_turret_cost()]
 	turret_mode_button.text = "Turret Target: %s" % _get_target_mode_display_name(turret_target_mode)
 	catapult_button.text = "Catapult Lv.%d %s" % [max(catapult_level, 1), "(%d)" % _get_catapult_cost() if keep_level >= 3 else "(Unlock at Keep 3)"]
 	catapult_mode_button.text = "Catapult Target: %s" % _get_target_mode_display_name(catapult_target_mode)
@@ -1803,7 +2224,7 @@ func _refresh_shop_buttons() -> void:
 	damage_button.disabled = can_shop == false
 	wall_upgrade_button.disabled = can_shop == false
 	keep_upgrade_button.disabled = can_shop == false
-	turret_button.disabled = can_shop == false or keep_level < 2
+	turret_button.disabled = can_shop == false
 	turret_mode_button.disabled = can_shop == false or turret_level <= 0
 	catapult_button.disabled = can_shop == false or keep_level < 3
 	catapult_mode_button.disabled = can_shop == false or catapult_level <= 0
