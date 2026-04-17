@@ -26,6 +26,14 @@ const SORCERER_IDLE    := preload("res://assets/player/wizard/sorcerer_idle.png"
 const SORCERER_ATTACK  := preload("res://assets/player/wizard/sorcerer_attack.png")
 const SORCERER_DEATH   := preload("res://assets/player/wizard/death.png")
 
+const WITCH_IDLE       := preload("res://assets/player/witch/idle_sheet.png")
+const WITCH_ATTACK     := preload("res://assets/player/witch/attack_sheet.png")
+
+const NINJA_IDLE       := preload("res://assets/player/ninja/idle.png")
+const NINJA_WALK       := preload("res://assets/player/ninja/walk.png")
+const NINJA_ATTACK     := preload("res://assets/player/ninja/attack.png")
+const NINJA_DEATH      := preload("res://assets/player/ninja/death.png")
+
 @export var speed := 350.0
 @export var wall_y := 90.0
 @export var left_bound := 24.0
@@ -227,7 +235,16 @@ func _update_facing(direction: float) -> void:
 func _build_animations() -> void:
 	var frames := SpriteFrames.new()
 
-	if GameState.selected_character == GameState.CHAR_WIZARD:
+	if GameState.selected_character == GameState.CHAR_ALCHEMIST:
+		# Ninja: idle 8f strip, walk 10f strip, attack 20f strip, death 14f strip
+		_add_strip_animation(frames, "idle",   NINJA_IDLE,    8,  6.0, true)
+		_add_strip_animation(frames, "run",    NINJA_WALK,   10, 12.0, true)
+		_add_strip_animation(frames, "attack", NINJA_ATTACK, 20, 18.0, false)
+		_add_strip_animation(frames, "death",  NINJA_DEATH,  14,  8.0, false)
+		animated_sprite.scale = Vector2(1.4, 1.4)
+		fire_cooldown = 0.22
+		melee_attack_radius = 55.0
+	elif GameState.selected_character == GameState.CHAR_WIZARD:
 		_add_grid_animation(frames, "idle",   WIZARD_IDLE,   10, 1, 0, 0, 9,  6.0, true)
 		_add_grid_animation(frames, "run",    WIZARD_FLY,     6, 1, 0, 0, 5,  8.0, true)
 		_add_grid_animation(frames, "attack", WIZARD_ATTACK,  8, 1, 0, 0, 7, 14.0, false)

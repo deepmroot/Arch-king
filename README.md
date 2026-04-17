@@ -38,10 +38,12 @@ The current version is structured around two connected spaces:
   - **battlefield view** on the wall
   - **back-area view** below the wall
 - Camera transitions when moving up/down the ladder
-- Responsive widescreen/fullscreen layout
+- Responsive widescreen/fullscreen layout at 1280×720 base
 - Adaptive horizontal expansion for wider monitors
 - Fullscreen, borderless, and windowed display support
 - Resolution scale option
+- Prep phase countdown shown in the centre of the screen
+- Streamlined HUD in the bottom-left corner (HP, coins, wave, phase)
 - Back area for shop + trap setup
 
 ### Waves
@@ -112,13 +114,32 @@ The current version is structured around two connected spaces:
 - Visual differences for enemy variants
 - Shadows under player/enemies
 - Wall-hit feedback and camera shake
-- Procedural placeholder sound effects for combat, traps, shop, waves, and turrets
-- Generated background music with separate music volume control
+- Full authored sound effects wired to all game events:
+  - arrow shoot, enemy hit, enemy death, wall hit
+  - coin pickup, wave start, wave clear
+  - shop open, trap trigger, catapult fire, turret shoot
+  - game over sting on player defeat
+  - UI click sound on all buttons in menus and shop
+- Menu music plays from Main Menu through Character Select, stops on game start
+- Cinematic battle music loops during gameplay only
+
+### Characters
+- 6 playable classes: Archer, Hero Knight, Huntress, Ninja, Sorcerer, Wizard
+- Character select screen with animated preview and class info
+- Fully responsive character select UI scales to any resolution
+- Each class has unique bonuses and playstyle
+- Melee and ranged character types with battlefield movement
+
+### Deployable Defenders
+- Knight guards — melee defenders that chase and attack enemies
+- Witch defenders — stationary magic defenders that auto-target enemies
+- Both purchasable from the shop (max 3 each)
 
 ### Game Flow / Menus
-- Main menu
+- Main menu with themed background
+- Character select screen
 - Pause menu
-- Game over screen
+- Game over screen with final stats
 - Restart flow
 - Options menu
 - Saved settings via `user://settings.cfg`
@@ -180,6 +201,8 @@ The current version is structured around two connected spaces:
 - **Turret Target Mode**
 - **Catapult**
 - **Catapult Target Mode**
+- **Deploy Knight** — melee defender
+- **Deploy Witch** — stationary magic defender
 - **Spike Trap**
 - **Fire Trap**
 - **Slow Trap**
@@ -215,20 +238,25 @@ Main scene:
 - `scripts/player.gd` → player movement, ladder-ready movement states, aiming, shooting, animations
 - `scripts/enemy.gd` → enemy movement, HP, hit/death reactions, wall pressure
 - `scripts/arrow.gd` → arrow movement, damage, collision, visual glow
+- `scripts/knight_guard.gd` → deployable NPC defenders (knight + witch)
+- `scripts/game_state.gd` → character selection, bonuses, global state
+- `scripts/character_select.gd` → character select screen UI
+- `scripts/main_menu.gd` → main menu screen
 - `scripts/floating_text.gd` → floating combat text feedback
 - `scripts/options_panel.gd` → reusable options/settings UI logic
 
 ### Scenes
+- `scenes/MainMenu.tscn`
+- `scenes/CharacterSelect.tscn`
+- `scenes/Level.tscn`
 - `scenes/Player.tscn`
 - `scenes/Enemy.tscn`
 - `scenes/Arrow.tscn`
-- `scenes/Level.tscn`
+- `scenes/KnightGuard.tscn`
 - `scenes/OptionsPanel.tscn`
 
 ### Docs
-- `GEMINI.md` → project handover / technical summary
-- `REFERENCE_ALIGNMENT.md` → reference-image implementation plan
-- `reference_idea.png` → target look and gameplay direction
+- `README.md` → project overview and documentation
 
 ---
 
@@ -252,15 +280,20 @@ Implemented now:
 - responsive widescreen/fullscreen support
 - options menu with saved settings
 - keyboard / mouse / basic gamepad support
-- generated music + placeholder SFX
+- authored sound effects wired to all game events
+- menu music persists into character select, stops on game start
+- cinematic battle music looping during gameplay
+- game over sting on defeat
+- UI click sounds on all buttons
 - combat polish pass including floating text and turret effects
+- responsive character select UI at any resolution
+- prep phase countdown centred on screen
+- streamlined bottom-left HUD
 
-Still good next targets:
-- replace generated audio with authored assets
+Potential next steps:
 - split `level.gd` into smaller systems
 - stronger enemy behaviors beyond stat variation
 - more fortress defenses and trap variety
-- stronger custom art pass for towers / wall / UI
 
 ---
 
@@ -391,8 +424,6 @@ If the stash pop creates conflicts, resolve them manually in the files.
 - `scripts/player.gd`
 - `scripts/enemy.gd`
 - `scripts/arrow.gd`
-- `reference_idea.png`
-- `REFERENCE_ALIGNMENT.md`
 
 ---
 

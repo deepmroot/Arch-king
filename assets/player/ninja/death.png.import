@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://cts3yqlfy0l1s"
-path="res://.godot/imported/bg_forest.png-f201d05c4823a50ef8fb82eafc6198f7.ctex"
+uid="uid://cyihn42w2nso3"
+path="res://.godot/imported/death.png-ae02047d1a72c6ec1ff345e4b3692ba8.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://assets/environment/bg_forest.png"
-dest_files=["res://.godot/imported/bg_forest.png-f201d05c4823a50ef8fb82eafc6198f7.ctex"]
+source_file="res://assets/player/ninja/death.png"
+dest_files=["res://.godot/imported/death.png-ae02047d1a72c6ec1ff345e4b3692ba8.ctex"]
 
 [params]
 

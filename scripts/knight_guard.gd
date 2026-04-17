@@ -14,6 +14,7 @@ const DEATH_SHEET := preload("res://assets/guards/knight/knight_death.png")
 @export var leash_range := 300.0
 @export var contact_damage_interval := 1.15
 @export var visual_scale := 1.45
+@export var stationary := false
 
 var current_health := 6
 var guard_index := 0
@@ -51,6 +52,7 @@ func configure(definition: Dictionary) -> void:
 	leash_range = float(definition.get("leash_range", leash_range))
 	contact_damage_interval = float(definition.get("contact_damage_interval", contact_damage_interval))
 	visual_scale = float(definition.get("visual_scale", visual_scale))
+	stationary = bool(definition.get("stationary", stationary))
 	home_position = definition.get("home_position", home_position)
 	battle_active = bool(definition.get("battle_active", battle_active))
 	current_health = max_health
@@ -134,6 +136,11 @@ func _find_target() -> Area2D:
 
 
 func _move_toward_point(target_position: Vector2, delta: float) -> void:
+	if stationary:
+		global_position = home_position
+		_play_idle()
+		return
+
 	var to_target := target_position - global_position
 	if to_target.length() <= 4.0:
 		global_position = global_position.lerp(target_position, 0.35)
@@ -143,7 +150,7 @@ func _move_toward_point(target_position: Vector2, delta: float) -> void:
 	if abs(to_target.x) > 2.0:
 		_update_facing(to_target.x)
 	global_position += to_target.normalized() * speed * delta
-	global_position.y = clamp(global_position.y, home_position.y - leash_range, home_position.y + 6.0)
+	global_position.y = clamp(global_position.y, -200.0, home_position.y + 6.0)
 	if animated_sprite.animation != "walk":
 		animated_sprite.play("walk")
 

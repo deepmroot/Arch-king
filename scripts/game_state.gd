@@ -1,10 +1,34 @@
 extends Node
 
+const MENU_MUSIC := preload("res://assets/audio/music/vulcan_mixed.mp3")
+
+var menu_music_player: AudioStreamPlayer = null
+
+
+func start_menu_music() -> void:
+	if menu_music_player != null and menu_music_player.playing:
+		return
+	if menu_music_player == null:
+		menu_music_player = AudioStreamPlayer.new()
+		menu_music_player.stream = MENU_MUSIC
+		menu_music_player.bus = "Master"
+		add_child(menu_music_player)
+	menu_music_player.play()
+
+
+func stop_menu_music() -> void:
+	if menu_music_player == null:
+		return
+	var fade := menu_music_player.create_tween()
+	fade.tween_property(menu_music_player, "volume_db", -80.0, 0.8)
+	fade.tween_callback(menu_music_player.stop)
+
+
 # Character IDs
 const CHAR_ARCHER   := "archer"
 const CHAR_WARDEN   := "warden"
 const CHAR_RANGER   := "ranger"
-const CHAR_ALCHEMIST := "alchemist"
+const CHAR_ALCHEMIST := "ninja"
 const CHAR_MERCHANT := "sorcerer"
 const CHAR_WIZARD   := "wizard"
 
@@ -36,13 +60,11 @@ func apply_to_level(level: Node) -> void:
 			level.starting_coins        += 2
 
 		CHAR_ALCHEMIST:
-			# Trap/AoE focus: extra coins, cheaper traps, catapult bonus radius baked via variable
+			# Ninja: fast melee, cheap traps, bonus starting coins
 			level.starting_coins       += 3
 			level.spike_trap_cost       = max(1, level.spike_trap_cost - 2)
 			level.fire_trap_cost        = max(1, level.fire_trap_cost - 2)
 			level.slow_trap_cost        = max(1, level.slow_trap_cost - 2)
-			# catapult AoE bonus — level.gd reads this in _update_catapult_attack
-			level.catapult_aoe_bonus    = 24.0
 
 		CHAR_MERCHANT:
 			# Economy: more starting coins, all upgrades 1 cheaper, longer prep
@@ -75,10 +97,10 @@ func bonus_coins_per_kill() -> int:
 
 
 func is_melee_character() -> bool:
-	return selected_character == CHAR_WARDEN or selected_character == CHAR_MERCHANT
+	return selected_character == CHAR_WARDEN or selected_character == CHAR_MERCHANT or selected_character == CHAR_ALCHEMIST
 
 func is_battlefield_character() -> bool:
-	return selected_character == CHAR_WARDEN or selected_character == CHAR_MERCHANT
+	return selected_character == CHAR_WARDEN or selected_character == CHAR_MERCHANT or selected_character == CHAR_ALCHEMIST
 
 
 # ── Ranger pierce: every 5th arrow pierces one extra enemy ────────────────────
@@ -139,15 +161,15 @@ static func get_characters() -> Array[Dictionary]:
 		},
 		{
 			"id": CHAR_ALCHEMIST,
-			"name": "Alchemist",
-			"title": "Master of Destruction",
-			"icon_color": Color(0.85, 0.55, 0.20, 1),
+			"name": "Ninja",
+			"title": "Shadow Striker",
+			"icon_color": Color(0.28, 0.82, 0.72, 1),
 			"abilities": [
+				"Melee — fights on the battlefield",
+				"Fastest attack speed",
 				"All traps cost 2 less",
-				"Catapult AoE radius +24",
-				"+ 3 Starting Coins",
 			],
-			"playstyle": "Area Control — blanket the battlefield in fire, spikes, and explosions.",
+			"playstyle": "Aggressive Melee — leap into the battlefield and slice through enemies up close.",
 		},
 		{
 			"id": CHAR_MERCHANT,

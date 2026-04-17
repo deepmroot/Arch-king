@@ -1,5 +1,6 @@
 extends Control
 
+const SFX_CLICK := preload("res://assets/audio/sfx/ui_click.mp3")
 const UI_BTN_NORMAL_TEX := preload("res://assets/ui/kenney_fantasy_ui_borders/panel-010.png")
 const UI_BTN_HOVER_TEX := preload("res://assets/ui/kenney_fantasy_ui_borders/panel-011.png")
 const UI_BTN_PRESSED_TEX := preload("res://assets/ui/kenney_fantasy_ui_borders/panel-012.png")
@@ -8,6 +9,8 @@ const ARCHER_IDLE_RUN_SHEET := preload("res://assets/player/archer/idle_run.png"
 const BASE_IDLE_RUN_SHEET := preload("res://assets/player/idle_run.png")
 const WIZARD_IDLE_SHEET := preload("res://assets/player/wizard/idle.png")
 const SORCERER_IDLE_SHEET := preload("res://assets/player/wizard/sorcerer_idle.png")
+const WITCH_IDLE_SHEET := preload("res://assets/player/witch/idle_sheet.png")
+const NINJA_IDLE_SHEET := preload("res://assets/player/ninja/idle.png")
 const HERO_KNIGHT_IDLE_SHEET := preload("res://assets/player/hero_knight/idle.png")
 const HUNTRESS_IDLE_SHEET := preload("res://assets/player/huntress/Idle.png")
 
@@ -31,6 +34,7 @@ var _card_name_labels: Array[Label] = []
 
 var _preview_sprite_large_y: float = 228.0
 var _preview_stage_scale: float = 1.0
+var _scale: float = 1.0
 var _picker_scroll: ScrollContainer
 var _preview_sprite: AnimatedSprite2D
 var _preview_name_label: Label
@@ -41,9 +45,20 @@ var _detail_playstyle_label: Label
 var _detail_abilities_box: VBoxContainer
 var _confirm_btn: Button
 var _black_overlay: ColorRect
+var _click_player: AudioStreamPlayer
 
 
-func _ready() -> void: 
+func _click() -> void:
+	if _click_player == null:
+		_click_player = AudioStreamPlayer.new()
+		_click_player.stream = SFX_CLICK
+		add_child(_click_player)
+	_click_player.volume_db = 0.0
+	_click_player.pitch_scale = randf_range(0.95, 1.05)
+	_click_player.play()
+
+
+func _ready() -> void:
 	_characters = _get_character_entries()
 	_selected_index = _find_character_index(_selected_id)
 	if _selected_index < 0:
@@ -60,29 +75,23 @@ func _vp() -> Vector2:
 
 func _build_ui() -> void:
 	var vp: Vector2 = _vp()
-	var base_size := Vector2(1280.0, 720.0)
-	var scale_x: float = vp.x / base_size.x
-	var scale_y: float = vp.y / base_size.y
-	var ui_scale: float = min(scale_x, scale_y)
-	ui_scale = max(ui_scale, 0.72)
-	var offset_x: float = max((vp.x - (base_size.x * ui_scale)) * 0.5, 0.0)
-	var offset_y: float = max((vp.y - (base_size.y * ui_scale)) * 0.5, 0.0)
+	# Scale everything to fit any resolution using vp directly
+	var s: float = min(vp.x / 1280.0, vp.y / 720.0)
+	s = max(s, 0.6)
+	_scale = s
 
-	var picker_y_pos: float = vp.y - 250.0
-	var confirm_btn_y: float = picker_y_pos - 68.0
-	var panels_h: float = clamp(confirm_btn_y - 126.0 - 12.0, 240.0, 478.0)
+	var margin_x := vp.x * 0.03
+	var top_header_h := vp.y * 0.14
+	var picker_h := vp.y * 0.30
+	var picker_y_pos: float = vp.y - picker_h - 10.0
+	var confirm_btn_y: float = picker_y_pos - 56.0 * s
+	var panels_top: float = top_header_h
+	var panels_h: float = clamp(confirm_btn_y - panels_top - 8.0, 200.0, 460.0)
 
-	var sx := func(x: float) -> float:
-		return offset_x + (x * ui_scale)
-
-	var sy := func(y: float) -> float:
-		return offset_y + (y * ui_scale)
-
-	var sw := func(w: float) -> float:
-		return w * ui_scale
-
-	var sh := func(h: float) -> float:
-		return h * ui_scale
+	var sx := func(x: float) -> float: return x * s
+	var sy := func(y: float) -> float: return y * s
+	var sw := func(w: float) -> float: return w * s
+	var sh := func(h: float) -> float: return h * s
 
 	var sky := ColorRect.new()
 	sky.position = Vector2.ZERO
@@ -111,213 +120,187 @@ func _build_ui() -> void:
 	var header := Label.new()
 	header.text = "Choose Your Champion"
 	header.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	header.position = Vector2(0.0, 18.0)
-	header.size = Vector2(vp.x, 54.0)
+	header.position = Vector2(0.0, vp.y * 0.025)
+	header.size = Vector2(vp.x, sy.call(50.0))
 	header.add_theme_color_override("font_color", TEXT_GOLD)
 	header.add_theme_color_override("font_shadow_color", Color(0.22, 0.14, 0.06, 0.75))
 	header.add_theme_constant_override("shadow_offset_x", 2)
 	header.add_theme_constant_override("shadow_offset_y", 3)
-	header.add_theme_font_size_override("font_size", 36)
+	header.add_theme_font_size_override("font_size", int(32 * s))
 	add_child(header)
 
 	var sub := Label.new()
-	sub.text = "See the hero, review the role, then scroll through the roster."
+	sub.text = "Pick your hero, then press Play."
 	sub.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	sub.position = Vector2(0.0, 66.0)
-	sub.size = Vector2(vp.x, 24.0)
+	sub.position = Vector2(0.0, vp.y * 0.025 + sy.call(46.0))
+	sub.size = Vector2(vp.x, sy.call(22.0))
 	sub.add_theme_color_override("font_color", Color(0.30, 0.21, 0.12, 0.95))
-	sub.add_theme_font_size_override("font_size", 15)
+	sub.add_theme_font_size_override("font_size", int(13 * s))
 	add_child(sub)
 
-	var divider := ColorRect.new()
-	divider.position = Vector2((vp.x - 360.0) * 0.5, 98.0)
-	divider.size = Vector2(360.0, 2.0)
-	divider.color = Color(0.58, 0.45, 0.22, 0.42)
-	add_child(divider)
-
-	var back_btn := _make_button("← Back", 16)
-	back_btn.position = Vector2(26.0, 22.0)
-	back_btn.size = Vector2(118.0, 40.0)
+	var back_btn := _make_button("← Back", int(15 * s))
+	back_btn.position = Vector2(margin_x, vp.y * 0.022)
+	back_btn.size = Vector2(sw.call(110.0), sy.call(38.0))
 	back_btn.pressed.connect(_on_back)
 	add_child(back_btn)
 
-	var preview_panel := _create_panel(388.0, panels_h)
-	preview_panel.position = Vector2(42.0, 126.0)
+	var preview_panel_w: float = sw.call(360.0)
+	var preview_panel := _create_panel(preview_panel_w, panels_h)
+	preview_panel.position = Vector2(margin_x, panels_top)
 	add_child(preview_panel)
 
-	var preview_heading := Label.new()
-	preview_heading.text = "Visual Preview"
-	preview_heading.position = Vector2(24.0, 16.0)
-	preview_heading.size = Vector2(220.0, 28.0)
-	preview_heading.add_theme_color_override("font_color", TEXT_GOLD)
-	preview_heading.add_theme_font_size_override("font_size", 18)
-	preview_panel.add_child(preview_heading)
-
-	var preview_hint := Label.new()
-	preview_hint.text = "Selected class appearance"
-	preview_hint.position = Vector2(24.0, 42.0)
-	preview_hint.size = Vector2(220.0, 20.0)
-	preview_hint.add_theme_color_override("font_color", TEXT_MUTED)
-	preview_hint.add_theme_font_size_override("font_size", 12)
-	preview_panel.add_child(preview_hint)
-
-	var stage_top := 76.0
-	var stage_h: float = clamp(panels_h - 200.0, 120.0, 250.0)
+	var pad: float = sw.call(18.0)
+	var stage_top: float = sy.call(12.0)
+	var stage_h: float = clamp(panels_h - sy.call(155.0), sy.call(100.0), sy.call(230.0))
 	var stage_bot: float = stage_top + stage_h
+	var stage_w: float = preview_panel_w - pad * 2.0
 
 	var stage_clip := Control.new()
-	stage_clip.position = Vector2(24.0, stage_top)
-	stage_clip.size = Vector2(340.0, stage_h)
+	stage_clip.position = Vector2(pad, stage_top)
+	stage_clip.size = Vector2(stage_w, stage_h)
 	stage_clip.clip_contents = true
 	preview_panel.add_child(stage_clip)
 
 	var preview_stage := ColorRect.new()
 	preview_stage.position = Vector2.ZERO
-	preview_stage.size = Vector2(340.0, stage_h)
+	preview_stage.size = Vector2(stage_w, stage_h)
 	preview_stage.color = Color(0.18, 0.16, 0.12, 0.92)
 	stage_clip.add_child(preview_stage)
 
 	var preview_stage_bar := ColorRect.new()
 	preview_stage_bar.position = Vector2.ZERO
-	preview_stage_bar.size = Vector2(340.0, 4.0)
+	preview_stage_bar.size = Vector2(stage_w, 3.0)
 	preview_stage_bar.color = PANEL_HIGHLIGHT
 	stage_clip.add_child(preview_stage_bar)
 
 	var preview_floor := ColorRect.new()
-	preview_floor.position = Vector2(30.0, stage_h * 0.824)
-	preview_floor.size = Vector2(280.0, 10.0)
+	preview_floor.position = Vector2(stage_w * 0.1, stage_h * 0.82)
+	preview_floor.size = Vector2(stage_w * 0.8, 8.0)
 	preview_floor.color = Color(0.0, 0.0, 0.0, 0.24)
 	stage_clip.add_child(preview_floor)
 
-	_preview_sprite_large_y = stage_h * 0.35
+	_preview_sprite_large_y = stage_h * 0.38
 	_preview_stage_scale = stage_h / 250.0
 	_preview_sprite = AnimatedSprite2D.new()
-	_preview_sprite.position = Vector2(170.0, _preview_sprite_large_y)
+	_preview_sprite.position = Vector2(stage_w * 0.5, _preview_sprite_large_y)
 	_preview_sprite.z_index = 2
 	stage_clip.add_child(_preview_sprite)
 
 	_preview_name_label = Label.new()
-	_preview_name_label.position = Vector2(24.0, stage_bot + 6.0)
-	_preview_name_label.size = Vector2(340.0, 34.0)
+	_preview_name_label.position = Vector2(pad, stage_bot + sy.call(4.0))
+	_preview_name_label.size = Vector2(stage_w, sy.call(30.0))
 	_preview_name_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_preview_name_label.add_theme_color_override("font_color", TEXT_GOLD)
-	_preview_name_label.add_theme_font_size_override("font_size", 26)
+	_preview_name_label.add_theme_font_size_override("font_size", int(22 * s))
 	preview_panel.add_child(_preview_name_label)
 
 	_preview_title_label = Label.new()
-	_preview_title_label.position = Vector2(24.0, stage_bot + 40.0)
-	_preview_title_label.size = Vector2(340.0, 24.0)
+	_preview_title_label.position = Vector2(pad, stage_bot + sy.call(34.0))
+	_preview_title_label.size = Vector2(stage_w, sy.call(20.0))
 	_preview_title_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_preview_title_label.add_theme_color_override("font_color", TEXT_MUTED)
-	_preview_title_label.add_theme_font_size_override("font_size", 15)
+	_preview_title_label.add_theme_font_size_override("font_size", int(13 * s))
 	preview_panel.add_child(_preview_title_label)
 
 	_preview_role_label = Label.new()
-	_preview_role_label.position = Vector2(24.0, stage_bot + 72.0)
-	_preview_role_label.size = Vector2(340.0, 22.0)
+	_preview_role_label.position = Vector2(pad, stage_bot + sy.call(58.0))
+	_preview_role_label.size = Vector2(stage_w, sy.call(20.0))
 	_preview_role_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_preview_role_label.add_theme_color_override("font_color", TEXT_BODY)
-	_preview_role_label.add_theme_font_size_override("font_size", 14)
+	_preview_role_label.add_theme_font_size_override("font_size", int(12 * s))
 	preview_panel.add_child(_preview_role_label)
 
 	_preview_edge_label = Label.new()
-	_preview_edge_label.position = Vector2(24.0, stage_bot + 96.0)
-	_preview_edge_label.size = Vector2(340.0, 22.0)
+	_preview_edge_label.position = Vector2(pad, stage_bot + sy.call(80.0))
+	_preview_edge_label.size = Vector2(stage_w, sy.call(20.0))
 	_preview_edge_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_preview_edge_label.add_theme_color_override("font_color", Color(0.98, 0.90, 0.70, 0.95))
-	_preview_edge_label.add_theme_font_size_override("font_size", 13)
+	_preview_edge_label.add_theme_font_size_override("font_size", int(11 * s))
 	preview_panel.add_child(_preview_edge_label)
 
-	var info_panel_width: float = vp.x - 472.0
+	var info_x: float = margin_x + preview_panel_w + sw.call(16.0)
+	var info_panel_width: float = vp.x - info_x - margin_x
 	var info_panel := _create_panel(info_panel_width, panels_h)
-	info_panel.position = Vector2(460.0, 126.0)
+	info_panel.position = Vector2(info_x, panels_top)
 	add_child(info_panel)
 
 	var info_heading := Label.new()
 	info_heading.text = "Class Information"
-	info_heading.position = Vector2(24.0, 16.0)
-	info_heading.size = Vector2(info_panel_width - 48.0, 28.0)
+	info_heading.position = Vector2(pad, sy.call(14.0))
+	info_heading.size = Vector2(info_panel_width - pad * 2.0, sy.call(26.0))
 	info_heading.add_theme_color_override("font_color", TEXT_GOLD)
-	info_heading.add_theme_font_size_override("font_size", 20)
+	info_heading.add_theme_font_size_override("font_size", int(18 * s))
 	info_panel.add_child(info_heading)
 
-	var info_sub := Label.new()
-	info_sub.text = "Bonuses, role, and expected playstyle"
-	info_sub.position = Vector2(24.0, 42.0)
-	info_sub.size = Vector2(info_panel_width - 48.0, 20.0)
-	info_sub.add_theme_color_override("font_color", TEXT_MUTED)
-	info_sub.add_theme_font_size_override("font_size", 13)
-	info_panel.add_child(info_sub)
-
 	_detail_playstyle_label = Label.new()
-	_detail_playstyle_label.position = Vector2(24.0, 78.0)
-	_detail_playstyle_label.size = Vector2(info_panel_width - 48.0, 100.0)
+	_detail_playstyle_label.position = Vector2(pad, sy.call(46.0))
+	_detail_playstyle_label.size = Vector2(info_panel_width - pad * 2.0, sy.call(80.0))
 	_detail_playstyle_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	_detail_playstyle_label.add_theme_color_override("font_color", TEXT_BODY)
-	_detail_playstyle_label.add_theme_font_size_override("font_size", 16)
+	_detail_playstyle_label.add_theme_font_size_override("font_size", int(14 * s))
 	info_panel.add_child(_detail_playstyle_label)
 
 	var perk_title := Label.new()
 	perk_title.text = "Starting Bonuses"
-	perk_title.position = Vector2(24.0, 196.0)
-	perk_title.size = Vector2(info_panel_width - 48.0, 28.0)
+	perk_title.position = Vector2(pad, sy.call(138.0))
+	perk_title.size = Vector2(info_panel_width - pad * 2.0, sy.call(24.0))
 	perk_title.add_theme_color_override("font_color", TEXT_GOLD)
-	perk_title.add_theme_font_size_override("font_size", 18)
+	perk_title.add_theme_font_size_override("font_size", int(16 * s))
 	info_panel.add_child(perk_title)
 
 	var perk_divider := ColorRect.new()
-	perk_divider.position = Vector2(24.0, 228.0)
-	perk_divider.size = Vector2(info_panel_width - 48.0, 1.0)
+	perk_divider.position = Vector2(pad, sy.call(164.0))
+	perk_divider.size = Vector2(info_panel_width - pad * 2.0, 1.0)
 	perk_divider.color = Color(0.72, 0.60, 0.34, 0.28)
 	info_panel.add_child(perk_divider)
 
 	_detail_abilities_box = VBoxContainer.new()
-	_detail_abilities_box.position = Vector2(24.0, 246.0)
-	_detail_abilities_box.size = Vector2(info_panel_width - 48.0, 160.0)
-	_detail_abilities_box.add_theme_constant_override("separation", 10)
+	_detail_abilities_box.position = Vector2(pad, sy.call(172.0))
+	_detail_abilities_box.size = Vector2(info_panel_width - pad * 2.0, panels_h - sy.call(180.0))
+	_detail_abilities_box.add_theme_constant_override("separation", int(8 * s))
 	info_panel.add_child(_detail_abilities_box)
 
-	_confirm_btn = _make_button("Play", 22)
-	_confirm_btn.position = Vector2(460.0, confirm_btn_y)
-	_confirm_btn.size = Vector2(280.0, 56.0)
+	_confirm_btn = _make_button("Play", int(20 * s))
+	_confirm_btn.position = Vector2(info_x, confirm_btn_y)
+	_confirm_btn.size = Vector2(info_panel_width, sy.call(50.0))
 	_confirm_btn.pressed.connect(_on_confirm)
 	add_child(_confirm_btn)
 
-	var picker_panel := _create_panel(vp.x - 84.0, 224.0)
-	picker_panel.position = Vector2(42.0, picker_y_pos)
+	var picker_panel_w := vp.x - margin_x * 2.0
+	var picker_panel_h := picker_h - 10.0
+	var picker_panel := _create_panel(picker_panel_w, picker_panel_h)
+	picker_panel.position = Vector2(margin_x, picker_y_pos)
 	add_child(picker_panel)
 
 	var picker_heading := Label.new()
-	picker_heading.text = "Scroll Through Champions"
-	picker_heading.position = Vector2(24.0, 14.0)
-	picker_heading.size = Vector2(280.0, 26.0)
+	picker_heading.text = "Choose Your Champion"
+	picker_heading.position = Vector2(sw.call(16.0), sy.call(10.0))
+	picker_heading.size = Vector2(sw.call(260.0), sy.call(24.0))
 	picker_heading.add_theme_color_override("font_color", TEXT_GOLD)
-	picker_heading.add_theme_font_size_override("font_size", 18)
+	picker_heading.add_theme_font_size_override("font_size", int(15 * s))
 	picker_panel.add_child(picker_heading)
 
-	var picker_sub := Label.new()
-	picker_sub.text = "Mouse wheel, scrollbar, or arrow keys"
-	picker_sub.position = Vector2(24.0, 38.0)
-	picker_sub.size = Vector2(280.0, 20.0)
-	picker_sub.add_theme_color_override("font_color", TEXT_MUTED)
-	picker_sub.add_theme_font_size_override("font_size", 12)
-	picker_panel.add_child(picker_sub)
+	var arrow_btn_w: float = sw.call(44.0)
+	var arrow_btn_h: float = picker_panel_h - sy.call(38.0)
+	var arrow_y: float = sy.call(34.0)
 
-	var prev_btn := _make_button("◀", 18)
-	prev_btn.position = Vector2(24.0, 88.0)
-	prev_btn.size = Vector2(54.0, 104.0)
+	var prev_btn := _make_button("◀", int(16 * s))
+	prev_btn.position = Vector2(sw.call(8.0), arrow_y)
+	prev_btn.size = Vector2(arrow_btn_w, arrow_btn_h)
 	prev_btn.pressed.connect(func() -> void: _shift_selection(-1))
 	picker_panel.add_child(prev_btn)
 
-	var next_btn := _make_button("▶", 18)
-	next_btn.position = Vector2(picker_panel.size.x - 78.0, 88.0)
-	next_btn.size = Vector2(54.0, 104.0)
+	var next_btn := _make_button("▶", int(16 * s))
+	next_btn.position = Vector2(picker_panel_w - arrow_btn_w - sw.call(8.0), arrow_y)
+	next_btn.size = Vector2(arrow_btn_w, arrow_btn_h)
 	next_btn.pressed.connect(func() -> void: _shift_selection(1))
 	picker_panel.add_child(next_btn)
 
+	var scroll_x: float = sw.call(8.0) + arrow_btn_w + sw.call(4.0)
+	var scroll_w: float = picker_panel_w - scroll_x * 2.0
 	_picker_scroll = ScrollContainer.new()
-	_picker_scroll.position = Vector2(94.0, 80.0)
-	_picker_scroll.size = Vector2(picker_panel.size.x - 188.0, 124.0)
+	_picker_scroll.position = Vector2(scroll_x, arrow_y)
+	_picker_scroll.size = Vector2(scroll_w, arrow_btn_h)
 	_picker_scroll.clip_contents = true
 	picker_panel.add_child(_picker_scroll)
 
@@ -372,67 +355,73 @@ func _create_panel(w: float, h: float) -> Control:
 
 
 func _build_picker_card(entry: Dictionary, index: int) -> Control:
+	var s := _scale
+	var cw := 196.0 * s
+	var ch := 112.0 * s
+	var bw := 188.0 * s
+	var bh := 102.0 * s
+
 	var root := Control.new()
-	root.custom_minimum_size = Vector2(196.0, 112.0)
-	root.size = Vector2(196.0, 112.0)
+	root.custom_minimum_size = Vector2(cw, ch)
+	root.size = Vector2(cw, ch)
 	root.clip_contents = false
 
 	var shadow := ColorRect.new()
-	shadow.position = Vector2(6.0, 10.0)
-	shadow.size = Vector2(184.0, 96.0)
+	shadow.position = Vector2(6.0 * s, 10.0 * s)
+	shadow.size = Vector2(184.0 * s, 96.0 * s)
 	shadow.color = Color(0.0, 0.0, 0.0, 0.20)
 	root.add_child(shadow)
 
 	var body := ColorRect.new()
 	body.position = Vector2.ZERO
-	body.size = Vector2(188.0, 102.0)
+	body.size = Vector2(bw, bh)
 	body.color = Color(0.15, 0.12, 0.09, 0.96)
 	root.add_child(body)
 	_card_body_controls.append(body)
 
 	var strip := ColorRect.new()
 	strip.position = Vector2.ZERO
-	strip.size = Vector2(188.0, 4.0)
+	strip.size = Vector2(bw, 4.0 * s)
 	strip.color = entry.get("icon_color", TEXT_GOLD)
 	root.add_child(strip)
 	_card_strip_controls.append(strip)
 
 	var sprite := AnimatedSprite2D.new()
-	sprite.position = Vector2(44.0, 72.0)
+	sprite.position = Vector2(44.0 * s, 72.0 * s)
 	sprite.z_index = 2
 	root.add_child(sprite)
 	_apply_preview_to_sprite(sprite, entry, false)
 
 	var name_label := Label.new()
-	name_label.position = Vector2(84.0, 18.0)
-	name_label.size = Vector2(92.0, 24.0)
+	name_label.position = Vector2(84.0 * s, 18.0 * s)
+	name_label.size = Vector2(92.0 * s, 24.0 * s)
 	name_label.text = String(entry.get("name", ""))
 	name_label.add_theme_color_override("font_color", TEXT_GOLD)
-	name_label.add_theme_font_size_override("font_size", 16)
+	name_label.add_theme_font_size_override("font_size", int(16 * s))
 	root.add_child(name_label)
 	_card_name_labels.append(name_label)
 
 	var title_label := Label.new()
-	title_label.position = Vector2(84.0, 42.0)
-	title_label.size = Vector2(96.0, 40.0)
+	title_label.position = Vector2(84.0 * s, 42.0 * s)
+	title_label.size = Vector2(96.0 * s, 40.0 * s)
 	title_label.text = String(entry.get("title", ""))
 	title_label.add_theme_color_override("font_color", TEXT_MUTED)
-	title_label.add_theme_font_size_override("font_size", 11)
+	title_label.add_theme_font_size_override("font_size", int(11 * s))
 	title_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	root.add_child(title_label)
 
 	var hotkey_label := Label.new()
-	hotkey_label.position = Vector2(162.0, 10.0)
-	hotkey_label.size = Vector2(18.0, 18.0)
+	hotkey_label.position = Vector2(162.0 * s, 10.0 * s)
+	hotkey_label.size = Vector2(18.0 * s, 18.0 * s)
 	hotkey_label.text = str(index + 1)
 	hotkey_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	hotkey_label.add_theme_color_override("font_color", Color(0.96, 0.92, 0.82, 0.55))
-	hotkey_label.add_theme_font_size_override("font_size", 10)
+	hotkey_label.add_theme_font_size_override("font_size", int(10 * s))
 	root.add_child(hotkey_label)
 
 	var button := Button.new()
 	button.position = Vector2.ZERO
-	button.size = Vector2(188.0, 102.0)
+	button.size = Vector2(bw, bh)
 	button.flat = true
 	button.focus_mode = Control.FOCUS_NONE
 	button.add_theme_color_override("font_color", Color(0, 0, 0, 0))
@@ -500,22 +489,18 @@ func _get_character_entries() -> Array[Dictionary]:
 					"modulate": Color(0.96, 1.0, 0.92, 1.0),
 				}
 			GameState.CHAR_ALCHEMIST:
-				entry["role"] = "Role: Battlefield Control"
-				entry["edge"] = "Best for trap-heavy and catapult-heavy runs"
+				entry["role"] = "Role: Fast Melee Striker"
+				entry["edge"] = "Best for aggressive front-line runs"
 				entry["preview"] = {
-					"mode": "grid",
-					"sheet": BASE_IDLE_RUN_SHEET,
-					"columns": 8,
-					"rows": 2,
-					"row_index": 0,
-					"column_start": 0,
-					"column_end": 1,
-					"fps": 4.0,
-					"large_scale": 4.9,
-					"small_scale": 2.05,
-					"large_offset": Vector2(0.0, 24.0),
-					"small_offset": Vector2(0.0, 6.0),
-					"modulate": Color(1.08, 0.90, 0.72, 1.0),
+					"mode": "strip",
+					"sheet": NINJA_IDLE_SHEET,
+					"frame_count": 8,
+					"fps": 8.0,
+					"large_scale": 3.5,
+					"small_scale": 1.5,
+					"large_offset": Vector2(0.0, 16.0),
+					"small_offset": Vector2(0.0, 4.0),
+					"modulate": Color(1.0, 1.0, 1.0, 1.0),
 				}
 			GameState.CHAR_MERCHANT:
 				entry["role"] = "Role: Economy and Tempo"
@@ -649,12 +634,14 @@ func _apply_preview_to_sprite(sprite: AnimatedSprite2D, entry: Dictionary, large
 	var scale_value: float = float(preview.get("large_scale", 4.5)) if large_preview else float(preview.get("small_scale", 2.0))
 	if large_preview:
 		scale_value *= _preview_stage_scale
+	else:
+		scale_value *= _scale
 	sprite.scale = Vector2.ONE * scale_value
 	var offset: Vector2 = preview.get("large_offset", Vector2.ZERO) if large_preview else preview.get("small_offset", Vector2.ZERO)
 	if large_preview:
 		sprite.position = Vector2(170.0, _preview_sprite_large_y) + offset * _preview_stage_scale
 	else:
-		sprite.position = Vector2(36.0, 54.0) + offset
+		sprite.position = Vector2(36.0 * _scale, 72.0 * _scale) + offset * _scale
 	if sprite.sprite_frames != null:
 		sprite.play("idle")
 
@@ -699,6 +686,8 @@ func _build_preview_frames(preview: Dictionary) -> SpriteFrames:
 func _select_index(index: int) -> void:
 	if _characters.is_empty():
 		return
+	if index != _selected_index:
+		_click()
 	_selected_index = clamp(index, 0, _characters.size() - 1)
 	_refresh_selection(true)
 
@@ -751,6 +740,7 @@ func _unhandled_input(event: InputEvent) -> void:
 
 
 func _on_confirm() -> void:
+	_click()
 	GameState.selected_character = _selected_id
 	_black_overlay.mouse_filter = Control.MOUSE_FILTER_STOP
 	var tween: Tween = create_tween()
@@ -759,6 +749,7 @@ func _on_confirm() -> void:
 
 
 func _on_back() -> void:
+	_click()
 	_black_overlay.mouse_filter = Control.MOUSE_FILTER_STOP
 	var tween: Tween = create_tween()
 	tween.tween_property(_black_overlay, "color:a", 1.0, 0.38)

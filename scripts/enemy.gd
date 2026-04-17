@@ -5,22 +5,25 @@ signal reached_wall(damage: int)
 signal wall_attacked(damage: int)
 signal enemy_hit(damage_dealt: int, killed: bool, target_type: String, world_position: Vector2, elite: bool)
 
-const GOBLIN_SHEET := preload("res://assets/enemies/goblin.png")
-
-# Per-type goblin variant sprites (4-dir x 3-frame grid each)
-const GOBLIN_GRUNT := preload("res://assets/enemies/goblins/$Goblin_1.png")
-const GOBLIN_ARMORED := preload("res://assets/enemies/goblins/$Goblin_2.png")
-const GOBLIN_RUNNER := preload("res://assets/enemies/goblins/$Goblin_3.png")
-const GOBLIN_RANGED := preload("res://assets/enemies/goblins/$Goblin_4.png")
-const GOBLIN_SHIELD := preload("res://assets/enemies/goblins/$Goblin_5.png")
-const GOBLIN_SHADOW := preload("res://assets/enemies/goblins/Shadow.png")
+const CREATURE_GOBLIN     := preload("res://assets/enemies/creatures/goblin.png")
+const CREATURE_SKELETON   := preload("res://assets/enemies/creatures/skeleton.png")
+const CREATURE_MUSHROOM   := preload("res://assets/enemies/creatures/mushroom.png")
+const CREATURE_FLYING_EYE := preload("res://assets/enemies/creatures/flying_eye.png")
 const GOBLIN_KING_SHEET := preload("res://assets/enemies/goblin_king/goblin_king_sheet.png")
 const GOBLIN_MECH_SHEET := preload("res://assets/enemies/goblin_mech/goblin_mech_sheet.png")
-const FROST_GOBLIN_0 := preload("res://assets/enemies/frost_goblins/Frost_Goblin_0.png")
-const LARGE_FROST_GOBLIN_0 := preload("res://assets/enemies/frost_goblins/Large_Frost_Goblin_0.png")
 const MECHA_GOLEM_SHEET := preload("res://assets/enemies/mecha_golem/character_sheet.png")
 const MECHA_GOLEM_LASER_SHEET := preload("res://assets/enemies/mecha_golem/laser_sheet.png")
 const MECHA_GOLEM_PROJECTILE_GLOW := preload("res://assets/enemies/mecha_golem/arm_projectile_glowing.png")
+
+# Goblin variant sheets: 350x320, 3 cols x 4 rows (row 0 = walk toward camera)
+const GOBLIN_1 := preload("res://assets/enemies/goblins/$Goblin_1.png")
+const GOBLIN_3 := preload("res://assets/enemies/goblins/$Goblin_3.png")
+const GOBLIN_5 := preload("res://assets/enemies/goblins/$Goblin_5.png")
+
+
+# Large Frost Goblins: 256x256 single frames (tank/boss stand-ins)
+const LARGE_FROST_0 := preload("res://assets/enemies/frost_goblins/Large_Frost_Goblin_0.png")
+const LARGE_FROST_4 := preload("res://assets/enemies/frost_goblins/Large_Frost_Goblin_4.png")
 
 @export var speed := 85.0
 @export var max_health := 1
@@ -40,7 +43,7 @@ var attack_line_y := 0.0
 var slow_multiplier := 1.0
 var slow_time_remaining := 0.0
 var shield_points := 0
-var base_tint := Color(1, 1, 1, 1)
+var base_tint := Color(1, 1, 1, 1.0)
 var burst_speed_multiplier := 1.0
 var burst_duration := 0.0
 var burst_cooldown := 0.0
@@ -48,6 +51,9 @@ var burst_time_remaining := 0.0
 var burst_cooldown_remaining := 0.0
 var target_position := Vector2.ZERO
 var stop_distance := 12.0
+var drift_target_x := 576.0
+var drift_start_y := 0.0
+var drift_end_y := 0.0
 var mecha_charge_duration := 0.6
 var mecha_warning_active := false
 var mecha_warning_fx: Node2D
@@ -153,6 +159,11 @@ func _process(delta: float) -> void:
 
 	animated_sprite.speed_scale = 1.22 if burst_time_remaining > 0.0 else 1.0
 	global_position.y += speed * movement_multiplier * delta
+
+	if drift_end_y > drift_start_y and global_position.y >= drift_start_y:
+		var t: float = clamp((global_position.y - drift_start_y) / (drift_end_y - drift_start_y), 0.0, 1.0)
+		var eased: float = t * t * (3.0 - 2.0 * t)
+		global_position.x = lerpf(global_position.x, drift_target_x, eased * delta * 3.5)
 
 	if global_position.y >= wall_y:
 		is_dead = true
@@ -341,13 +352,13 @@ func get_display_name() -> String:
 
 func _build_status_visuals() -> void:
 	health_bar_root = Node2D.new()
-	health_bar_root.position = Vector2(-22, -34)
+	health_bar_root.position = Vector2(-26, -42)
 	add_child(health_bar_root)
 
 	health_bar_bg = Polygon2D.new()
-	health_bar_bg.color = Color(0.08, 0.08, 0.1, 0.72)
+	health_bar_bg.color = Color(0.06, 0.06, 0.08, 0.82)
 	health_bar_bg.polygon = PackedVector2Array([
-		Vector2(0, 0), Vector2(44, 0), Vector2(44, 6), Vector2(0, 6)
+		Vector2(0, 0), Vector2(52, 0), Vector2(52, 7), Vector2(0, 7)
 	])
 	health_bar_root.add_child(health_bar_bg)
 
@@ -355,7 +366,7 @@ func _build_status_visuals() -> void:
 	health_bar_fill.color = Color(0.3, 0.92, 0.38, 0.95)
 	health_bar_fill.position = Vector2(2, 1)
 	health_bar_fill.polygon = PackedVector2Array([
-		Vector2(0, 0), Vector2(40, 0), Vector2(40, 4), Vector2(0, 4)
+		Vector2(0, 0), Vector2(48, 0), Vector2(48, 5), Vector2(0, 5)
 	])
 	health_bar_root.add_child(health_bar_fill)
 
@@ -396,52 +407,67 @@ func _update_health_bar() -> void:
 func _build_animations() -> void:
 	var frames := SpriteFrames.new()
 
-	# Goblin variant sheets are 350x320 (3x4 grid) but sprites within each cell are
-	# tiny (~25-30px) with lots of transparent padding. Need scale ~1.2 for ~30-36px visible.
-	# Goblin King 1024x704 (14x12) -> ~73x59 per frame, sprite fills more of the cell.
-	# Large Frost Goblin 256x256 single frame, sprite is ~80px within it.
-
 	match enemy_type:
 		"boss":
 			_add_grid_animation(frames, "walk", GOBLIN_KING_SHEET, 14, 12, 0, 0, 3, 8.0, true)
 			_add_grid_animation(frames, "death", GOBLIN_KING_SHEET, 14, 12, 7, 0, 7, 6.0, false)
-			animated_sprite.scale = Vector2.ONE * 0.9
+			animated_sprite.scale = Vector2.ONE * 1.1
 		"mecha_boss":
 			_add_grid_animation(frames, "walk", MECHA_GOLEM_SHEET, 10, 10, 6, 0, 9, 8.0, true)
 			_add_grid_animation(frames, "death", MECHA_GOLEM_SHEET, 10, 10, 7, 0, 9, 7.0, false)
-			animated_sprite.scale = Vector2.ONE * 0.92
+			animated_sprite.scale = Vector2.ONE * 1.12
 		"runner":
-			_add_variant_animation(frames, "walk", GOBLIN_RUNNER, 3, 4, 0, 10.0, true)
-			_add_variant_animation(frames, "death", GOBLIN_RUNNER, 3, 4, 3, 8.0, false)
-			animated_sprite.scale = Vector2.ONE * 1.2
+			# Goblin_3 (jester hat) — fast runner; visual_scale from level.gd will multiply on top
+			_add_grid_animation(frames, "walk", GOBLIN_3, 3, 4, 0, 0, 2, 12.0, true)
+			_add_grid_animation(frames, "death", GOBLIN_3, 3, 4, 3, 0, 2, 8.0, false)
+			animated_sprite.scale = Vector2.ONE * 2.4
 		"ranged":
-			_add_variant_animation(frames, "walk", GOBLIN_RANGED, 3, 4, 0, 10.0, true)
-			_add_variant_animation(frames, "death", GOBLIN_RANGED, 3, 4, 3, 8.0, false)
-			animated_sprite.scale = Vector2.ONE * 1.2
+			# CREATURE_MUSHROOM kept for ranged — distinctive silhouette, not a goblin
+			_add_strip_animation(frames, "walk", CREATURE_MUSHROOM, 11, 8.0, true)
+			_add_strip_animation(frames, "death", CREATURE_MUSHROOM, 11, 8.0, false)
+			animated_sprite.scale = Vector2.ONE * 0.82
 		"shield":
-			_add_variant_animation(frames, "walk", GOBLIN_SHIELD, 3, 4, 0, 10.0, true)
-			_add_variant_animation(frames, "death", GOBLIN_SHIELD, 3, 4, 3, 8.0, false)
-			animated_sprite.scale = Vector2.ONE * 1.2
+			# CREATURE_SKELETON for shield bearer — bony silhouette reads clearly
+			_add_strip_animation(frames, "walk", CREATURE_SKELETON, 6, 8.0, true)
+			_add_strip_animation(frames, "death", CREATURE_SKELETON, 6, 6.0, false)
+			animated_sprite.scale = Vector2.ONE * 0.82
 		"armored":
-			_add_variant_animation(frames, "walk", GOBLIN_ARMORED, 3, 4, 0, 10.0, true)
-			_add_variant_animation(frames, "death", GOBLIN_ARMORED, 3, 4, 3, 8.0, false)
-			animated_sprite.scale = Vector2.ONE * 1.2
+			# Goblin_5 (crowned/armored) — distinct from grunt
+			_add_grid_animation(frames, "walk", GOBLIN_5, 3, 4, 0, 0, 2, 8.0, true)
+			_add_grid_animation(frames, "death", GOBLIN_5, 3, 4, 3, 0, 2, 6.0, false)
+			animated_sprite.scale = Vector2.ONE * 2.5
 		"tank":
-			frames.add_animation("walk")
-			frames.set_animation_speed("walk", 4.0)
-			frames.set_animation_loop("walk", true)
-			frames.add_frame("walk", LARGE_FROST_GOBLIN_0)
-			frames.add_animation("death")
-			frames.set_animation_speed("death", 6.0)
-			frames.set_animation_loop("death", false)
-			frames.add_frame("death", LARGE_FROST_GOBLIN_0)
-			animated_sprite.scale = Vector2.ONE * 0.22
+			# Large Frost Goblin — big icy brute; 256x256 single frame
+			_add_still_frame(frames, "walk", LARGE_FROST_4, 3.0)
+			_add_still_frame(frames, "death", LARGE_FROST_0, 1.0)
+			animated_sprite.scale = Vector2.ONE * 0.38
 		_:
-			_add_variant_animation(frames, "walk", GOBLIN_GRUNT, 3, 4, 0, 10.0, true)
-			_add_variant_animation(frames, "death", GOBLIN_GRUNT, 3, 4, 3, 8.0, false)
-			animated_sprite.scale = Vector2.ONE * 1.2
+			# grunt — plain Goblin_1 (green standard goblin)
+			_add_grid_animation(frames, "walk", GOBLIN_1, 3, 4, 0, 0, 2, 10.0, true)
+			_add_grid_animation(frames, "death", GOBLIN_1, 3, 4, 3, 0, 2, 8.0, false)
+			animated_sprite.scale = Vector2.ONE * 2.3
 
 	animated_sprite.sprite_frames = frames
+
+
+func _add_strip_animation(
+	frames: SpriteFrames,
+	animation_name: String,
+	texture: Texture2D,
+	frame_count: int,
+	fps: float,
+	loop: bool
+) -> void:
+	frames.add_animation(animation_name)
+	frames.set_animation_speed(animation_name, fps)
+	frames.set_animation_loop(animation_name, loop)
+	var frame_width := int(texture.get_width() / float(max(frame_count, 1)))
+	var frame_height := texture.get_height()
+	for i in range(frame_count):
+		var atlas := AtlasTexture.new()
+		atlas.atlas = texture
+		atlas.region = Rect2(i * frame_width, 0, frame_width, frame_height)
+		frames.add_frame(animation_name, atlas)
 
 
 func _add_variant_animation(
@@ -492,3 +518,13 @@ func _add_grid_animation(
 		atlas.atlas = texture
 		atlas.region = Rect2(col * frame_width, row_index * frame_height, frame_width, frame_height)
 		frames.add_frame(animation_name, atlas)
+
+
+func _add_still_frame(frames: SpriteFrames, animation_name: String, texture: Texture2D, fps: float) -> void:
+	frames.add_animation(animation_name)
+	frames.set_animation_speed(animation_name, fps)
+	frames.set_animation_loop(animation_name, true)
+	var atlas := AtlasTexture.new()
+	atlas.atlas = texture
+	atlas.region = Rect2(0, 0, texture.get_width(), texture.get_height())
+	frames.add_frame(animation_name, atlas)

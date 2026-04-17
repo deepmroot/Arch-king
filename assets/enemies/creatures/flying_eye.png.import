@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://b2c6ywf5mwuuf"
-path="res://.godot/imported/menu_background.png-b4f9834e3582eef94efb8f92d64955da.ctex"
+uid="uid://dojye1jr5lhyw"
+path="res://.godot/imported/flying_eye.png-4d596d79a968408cd6f86f9852a25aee.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://assets/ui/mainmenu/menu_background.png"
-dest_files=["res://.godot/imported/menu_background.png-b4f9834e3582eef94efb8f92d64955da.ctex"]
+source_file="res://assets/enemies/creatures/flying_eye.png"
+dest_files=["res://.godot/imported/flying_eye.png-4d596d79a968408cd6f86f9852a25aee.ctex"]
 
 [params]
 

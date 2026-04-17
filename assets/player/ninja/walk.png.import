@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://cts3yqlfy0l1s"
-path="res://.godot/imported/bg_forest.png-f201d05c4823a50ef8fb82eafc6198f7.ctex"
+uid="uid://cyl6o81aifk0f"
+path="res://.godot/imported/walk.png-2c1ecf19df2f99ee5360ec3bf2ec97d5.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://assets/environment/bg_forest.png"
-dest_files=["res://.godot/imported/bg_forest.png-f201d05c4823a50ef8fb82eafc6198f7.ctex"]
+source_file="res://assets/player/ninja/walk.png"
+dest_files=["res://.godot/imported/walk.png-2c1ecf19df2f99ee5360ec3bf2ec97d5.ctex"]
 
 [params]
 

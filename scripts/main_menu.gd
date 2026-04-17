@@ -1,21 +1,14 @@
 extends Control
 
+const SFX_CLICK := preload("res://assets/audio/sfx/ui_click.mp3")
+
 # Assets
-const DIRT_TEX := preload("res://assets/environment/fantasy_tileset/picks/dirt_tile.png")
-const GATE_TEX := preload("res://assets/environment/fantasy_tileset/The Fan-tasy Tileset (Free)/Art/Buildings/CityWall_Gate_1.png")
-const TREE_TEX := preload("res://assets/environment/fantasy_tileset/The Fan-tasy Tileset (Free)/Art/Trees and Bushes/Tree_Emerald_1.png")
-const TREE2_TEX := preload("res://assets/environment/fantasy_tileset/The Fan-tasy Tileset (Free)/Art/Trees and Bushes/Tree_Emerald_3.png")
-const BUSH_TEX := preload("res://assets/environment/fantasy_tileset/The Fan-tasy Tileset (Free)/Art/Trees and Bushes/Bush_Emerald_4.png")
-const BANNER_TEX := preload("res://assets/environment/fantasy_tileset/The Fan-tasy Tileset (Free)/Art/Props/Banner_Stick_1_Purple.png")
-const WALL_TEX := preload("res://assets/environment/walls/wall_battlement.png")
-const PILLAR_TEX := preload("res://assets/environment/walls/wall_level1.png")
-const GOBLIN_TEX := preload("res://assets/enemies/goblins/$Goblin_1.png")
+const BG_FOREST_TEX := preload("res://assets/environment/bg_forest.png")
+const CASTLE_WALL_TEX := preload("res://assets/environment/castle_wall.png")
 const UI_PANEL_TEX := preload("res://assets/ui/kenney_fantasy_ui_borders/panel-transparent-border-010.png")
 const UI_BTN_NORMAL_TEX := preload("res://assets/ui/kenney_fantasy_ui_borders/panel-010.png")
 const UI_BTN_HOVER_TEX := preload("res://assets/ui/kenney_fantasy_ui_borders/panel-011.png")
 const UI_BTN_PRESSED_TEX := preload("res://assets/ui/kenney_fantasy_ui_borders/panel-012.png")
-
-const GAMEPLAY_GRASS_COLOR := Color(0.658824, 0.854902, 0.580392, 1.0)
 
 @onready var audio_player: AudioStreamPlayer = $AudioPlayer
 
@@ -34,10 +27,12 @@ var tap_label: Label
 
 var goblin_sprites: Array[Sprite2D] = []
 var goblin_speeds: Array[float] = []
+const GAMEPLAY_GRASS_COLOR := Color(0.658824, 0.854902, 0.580392, 1.0)
 
 
 func _ready() -> void:
 	audio_player.volume_db = -80.0
+	GameState.start_menu_music()
 	_build_splash_screen()
 
 
@@ -67,10 +62,6 @@ func _process(delta: float) -> void:
 			# Pulse early access label
 			if tap_label != null and tap_label.visible:
 				tap_label.modulate.a = 0.4 + abs(sin(phase_timer * 2.0)) * 0.6
-
-	# Fade menu music in across splashes
-	if audio_player.volume_db < linear_to_db(0.8):
-		audio_player.volume_db = move_toward(audio_player.volume_db, linear_to_db(0.8), delta * 15.0)
 
 
 func _transition_to(phase: String) -> void:
@@ -257,161 +248,45 @@ func _build_menu() -> void:
 
 
 func _build_menu_background(vp: Vector2) -> void:
-	# Match level proportions/colors more closely
-	var wall_top := vp.y * 0.522
-	var wall_bottom := vp.y * 0.60
-	var wall_center_y := (wall_top + wall_bottom) * 0.5
+	# Forest background — same image used in gameplay (upper half)
+	var wall_split_y := vp.y * 0.522
 
-	# Top field area — match the gameplay scene's plain green fill
-	var grass := ColorRect.new()
-	grass.position = Vector2.ZERO
-	grass.size = Vector2(vp.x, wall_bottom)
-	grass.color = GAMEPLAY_GRASS_COLOR
-	grass.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	menu_layer.add_child(grass)
+	var forest := TextureRect.new()
+	forest.texture = BG_FOREST_TEX
+	forest.position = Vector2.ZERO
+	forest.size = Vector2(vp.x, wall_split_y)
+	forest.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
+	forest.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	forest.z_index = 0
+	menu_layer.add_child(forest)
 
-	# Path lane in the center (same visual idea as gameplay)
-	var path := TextureRect.new()
-	path.texture = DIRT_TEX
-	path.position = Vector2(vp.x * 0.37, 0.0)
-	path.size = Vector2(vp.x * 0.26, wall_bottom)
-	path.stretch_mode = TextureRect.STRETCH_TILE
-	path.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	menu_layer.add_child(path)
-
-	# Lower support area + boundary strip
+	# Courtyard / support area (brown ground — same colour as level)
 	var support_area := ColorRect.new()
-	support_area.position = Vector2(0.0, wall_bottom)
-	support_area.size = Vector2(vp.x, vp.y - wall_bottom)
+	support_area.position = Vector2(0.0, wall_split_y)
+	support_area.size = Vector2(vp.x, vp.y - wall_split_y)
 	support_area.color = Color(0.52549, 0.431373, 0.247059, 0.9)
 	support_area.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	support_area.z_index = 0
 	menu_layer.add_child(support_area)
 
-	var backyard_boundary := ColorRect.new()
-	backyard_boundary.position = Vector2(0.0, vp.y * 0.933)
-	backyard_boundary.size = Vector2(vp.x, vp.y * 0.067)
-	backyard_boundary.color = Color(0.360784, 0.333333, 0.27451, 1)
-	backyard_boundary.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	menu_layer.add_child(backyard_boundary)
+	# Castle wall image — stretches from wall split down to bottom, same as Level scene
+	var castle_wall := TextureRect.new()
+	castle_wall.texture = CASTLE_WALL_TEX
+	castle_wall.position = Vector2(0.0, wall_split_y - 60.0)
+	castle_wall.size = Vector2(vp.x, vp.y - (wall_split_y - 60.0))
+	castle_wall.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
+	castle_wall.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	castle_wall.z_index = 1
+	menu_layer.add_child(castle_wall)
 
-	# Wall color bands like the level scene
-	var wall_band := ColorRect.new()
-	wall_band.position = Vector2(0.0, wall_top)
-	wall_band.size = Vector2(vp.x, wall_bottom - wall_top)
-	wall_band.color = Color(0.388235, 0.352941, 0.294118, 1)
-	wall_band.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	menu_layer.add_child(wall_band)
-
-	var wall_highlight := ColorRect.new()
-	wall_highlight.position = Vector2(0.0, wall_top)
-	wall_highlight.size = Vector2(vp.x, (wall_bottom - wall_top) * 0.3)
-	wall_highlight.color = Color(0.584314, 0.529412, 0.423529, 0.45)
-	wall_highlight.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	menu_layer.add_child(wall_highlight)
-
-	var wall_mid_shadow := ColorRect.new()
-	wall_mid_shadow.position = Vector2(0.0, wall_top + (wall_bottom - wall_top) * 0.42)
-	wall_mid_shadow.size = Vector2(vp.x, (wall_bottom - wall_top) * 0.28)
-	wall_mid_shadow.color = Color(0, 0, 0, 0.12)
-	wall_mid_shadow.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	menu_layer.add_child(wall_mid_shadow)
-
-	var wall_front_shadow := ColorRect.new()
-	wall_front_shadow.position = Vector2(0.0, wall_bottom)
-	wall_front_shadow.size = Vector2(vp.x, vp.y * 0.029)
-	wall_front_shadow.color = Color(0, 0, 0, 0.18)
-	wall_front_shadow.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	menu_layer.add_child(wall_front_shadow)
-
-	# Wall strip — alternating pillar/body textures used in gameplay
-	var body_scale := 90.0 / 256.0
-	var body_w := 338.0 * body_scale
-	var pillar_scale := 100.0 / 206.0
-	var pillar_w := 128.0 * pillar_scale
-	var cursor_x := 0.0
-	while cursor_x < vp.x + pillar_w:
-		var p := Sprite2D.new()
-		p.texture = PILLAR_TEX
-		p.scale = Vector2.ONE * pillar_scale
-		p.position = Vector2(cursor_x + pillar_w * 0.5, wall_center_y)
-		p.z_index = 2
-		menu_layer.add_child(p)
-		cursor_x += pillar_w
-
-		var b := Sprite2D.new()
-		b.texture = WALL_TEX
-		b.scale = Vector2.ONE * body_scale
-		b.position = Vector2(cursor_x + body_w * 0.5, wall_center_y)
-		b.z_index = 1
-		menu_layer.add_child(b)
-		cursor_x += body_w
-
-	# Gate centered on the wall line
-	var gate := Sprite2D.new()
-	gate.texture = GATE_TEX
-	gate.position = Vector2(vp.x * 0.5, wall_bottom - 2.0)
-	gate.scale = Vector2(2.0, 2.0)
-	gate.z_index = 4
-	menu_layer.add_child(gate)
-
-	# Trees and bushes placed similarly to level scene composition
-	var tree_data := [
-		{"p": Vector2(0.065, 0.11), "t": TREE_TEX},
-		{"p": Vector2(0.174, 0.278), "t": TREE_TEX},
-		{"p": Vector2(0.087, 0.5), "t": TREE_TEX},
-		{"p": Vector2(0.868, 0.167), "t": TREE_TEX},
-		{"p": Vector2(0.938, 0.444), "t": TREE_TEX},
-		{"p": Vector2(0.894, 0.644), "t": TREE2_TEX},
-		{"p": Vector2(0.122, 0.678), "t": TREE2_TEX},
-	]
-	for info in tree_data:
-		var tree := Sprite2D.new()
-		tree.texture = info["t"]
-		tree.position = Vector2(vp.x * info["p"].x, vp.y * info["p"].y)
-		tree.z_index = 0
-		menu_layer.add_child(tree)
-
-	var bush_positions := [
-		Vector2(vp.x * 0.308, vp.y * 0.394),
-		Vector2(vp.x * 0.677, vp.y * 0.372),
-		Vector2(vp.x * 0.276, vp.y * 0.578),
-		Vector2(vp.x * 0.729, vp.y * 0.578),
-	]
-	for bp in bush_positions:
-		var bush := Sprite2D.new()
-		bush.texture = BUSH_TEX
-		bush.position = bp
-		bush.scale = Vector2(1.35, 1.35)
-		bush.z_index = 0
-		menu_layer.add_child(bush)
-
-	# Banners flanking gate
-	for side in [-1.0, 1.0]:
-		var banner := Sprite2D.new()
-		banner.texture = BANNER_TEX
-		banner.position = Vector2(vp.x * 0.5 + side * 126.0, wall_top - 20.0)
-		banner.z_index = 5
-		menu_layer.add_child(banner)
-
-	# Marching goblins across the upper lane
-	goblin_sprites.clear()
-	goblin_speeds.clear()
-	for gi in range(5):
-		var gob := Sprite2D.new()
-		gob.texture = GOBLIN_TEX
-		gob.hframes = 3
-		gob.vframes = 4
-		gob.frame = gi % 3
-		gob.scale = Vector2(1.2, 1.2)
-		gob.z_index = 0
-		gob.position = Vector2(
-			randf_range(vp.x * 0.15, vp.x * 0.85),
-			randf_range(vp.y * 0.08, vp.y * 0.42)
-		)
-		gob.modulate = Color(1, 1, 1, 0.72)
-		menu_layer.add_child(gob)
-		goblin_sprites.append(gob)
-		goblin_speeds.append(randf_range(26.0, 54.0))
+	# Subtle dark overlay so the menu panel stands out
+	var shade := ColorRect.new()
+	shade.position = Vector2.ZERO
+	shade.size = vp
+	shade.color = Color(0.0, 0.0, 0.0, 0.28)
+	shade.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	shade.z_index = 2
+	menu_layer.add_child(shade)
 
 
 func _update_goblins(delta: float) -> void:
@@ -645,7 +520,15 @@ func _create_menu_button(label_text: String, font_size: int) -> Button:
 # CALLBACKS
 # ==========================================
 
+func _click() -> void:
+	audio_player.stream = SFX_CLICK
+	audio_player.volume_db = 0.0
+	audio_player.pitch_scale = randf_range(0.95, 1.05)
+	audio_player.play()
+
+
 func _on_start_pressed() -> void:
+	_click()
 	if black_overlay == null:
 		get_tree().change_scene_to_file("res://scenes/CharacterSelect.tscn")
 		return
@@ -656,15 +539,18 @@ func _on_start_pressed() -> void:
 
 
 func _on_options_pressed() -> void:
+	_click()
 	main_panel.visible = false
 	options_panel.visible = true
 
 
 func _on_exit_pressed() -> void:
+	_click()
 	get_tree().quit()
 
 
 func _on_back_pressed() -> void:
+	_click()
 	options_panel.visible = false
 	main_panel.visible = true
 

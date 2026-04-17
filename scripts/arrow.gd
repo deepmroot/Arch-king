@@ -1,6 +1,7 @@
 extends Area2D
 
 const ARROW_TEX := preload("res://assets/projectiles/arrow.png")
+const TURRET_BULLET_TEX := preload("res://assets/defenses/turret/turret_bullet.png")
 const HUNTRESS_SPEAR_TEX := preload("res://assets/player/huntress/Spear.png")
 const HUNTRESS_SPEAR_MOVE_TEX := preload("res://assets/player/huntress/Spear move.png")
 const WIZARD_BEAM_SHEET := preload("res://assets/projectiles/wizard_beam_sheet.png")
@@ -19,6 +20,8 @@ var previous_position := Vector2.ZERO
 var pierce := false  # If true, passes through the first enemy hit
 var is_wizard := false
 var is_huntress := false
+var is_turret := false
+var is_witch := false
 var _pierced := false
 
 @onready var glow: Sprite2D = $Glow
@@ -30,8 +33,12 @@ func _ready() -> void:
 	previous_position = global_position
 	if is_wizard:
 		_apply_wizard_visuals()
+	elif is_witch:
+		_apply_witch_visuals()
 	elif is_huntress:
 		_apply_huntress_visuals()
+	elif is_turret:
+		_apply_turret_visuals()
 	else:
 		_apply_damage_visuals()
 	area_entered.connect(_on_area_entered)
@@ -47,8 +54,12 @@ func set_damage(value: int) -> void:
 	damage = value
 	if is_wizard:
 		_apply_wizard_visuals()
+	elif is_witch:
+		_apply_witch_visuals()
 	elif is_huntress:
 		_apply_huntress_visuals()
+	elif is_turret:
+		_apply_turret_visuals()
 	else:
 		_apply_damage_visuals()
 
@@ -56,7 +67,7 @@ func set_damage(value: int) -> void:
 func _process(delta: float) -> void:
 	previous_position = global_position
 	global_position += velocity * delta
-	if is_wizard:
+	if is_wizard or is_witch:
 		var t := Time.get_ticks_msec() * 0.015
 		var beam_frame := WIZARD_BEAM_FRAME_A if sin(t * 1.9) > 0.0 else WIZARD_BEAM_FRAME_B
 		if glow != null:
@@ -107,6 +118,49 @@ func _apply_damage_visuals() -> void:
 	glow.scale = Vector2(0.28, 0.34)
 	if collision_shape != null and collision_shape.shape is RectangleShape2D:
 		(collision_shape.shape as RectangleShape2D).size = Vector2(10, 28)
+
+
+func _apply_witch_visuals() -> void:
+	if sprite != null:
+		sprite.visible = true
+		sprite.texture = WIZARD_BEAM_SHEET
+		sprite.hframes = 3
+		sprite.vframes = 4
+		sprite.frame_coords = WIZARD_BEAM_FRAME_B
+		sprite.scale = WIZARD_BEAM_BASE_SCALE
+		sprite.rotation = 0.0
+		sprite.modulate = Color(1.0, 0.55, 0.85, 0.95)
+	if glow == null:
+		return
+	glow.texture = WIZARD_BEAM_SHEET
+	glow.hframes = 3
+	glow.vframes = 4
+	glow.frame_coords = WIZARD_BEAM_FRAME_A
+	glow.rotation = 0.0
+	glow.modulate = Color(1.0, 0.3, 0.7, 0.65)
+	glow.scale = WIZARD_BEAM_GLOW_SCALE
+
+
+func _apply_turret_visuals() -> void:
+	if sprite != null:
+		sprite.visible = true
+		sprite.texture = TURRET_BULLET_TEX
+		sprite.hframes = 1
+		sprite.vframes = 1
+		sprite.frame = 0
+		sprite.rotation = 0.0
+		sprite.scale = Vector2(0.55, 0.55)
+		sprite.modulate = Color(1, 1, 1, 1)
+	if glow != null:
+		glow.texture = TURRET_BULLET_TEX
+		glow.hframes = 1
+		glow.vframes = 1
+		glow.frame = 0
+		glow.rotation = 0.0
+		glow.scale = Vector2(0.68, 0.68)
+		glow.modulate = Color(1.0, 0.88, 0.5, 0.35)
+	if collision_shape != null and collision_shape.shape is RectangleShape2D:
+		(collision_shape.shape as RectangleShape2D).size = Vector2(12, 12)
 
 
 func _apply_huntress_visuals() -> void:
@@ -171,7 +225,7 @@ func _on_area_entered(area: Area2D) -> void:
 
 
 func _spawn_trail() -> void:
-	if is_wizard:
+	if is_wizard or is_witch:
 		var head_position: Vector2 = previous_position.lerp(global_position, 0.78)
 		var mid_position: Vector2 = previous_position.lerp(global_position, 0.52)
 		var tail_position: Vector2 = previous_position.lerp(global_position, 0.22)
@@ -213,7 +267,7 @@ func _spawn_wizard_trail_shard(position: Vector2, angle: float, scale_value: Vec
 	shard.global_position = position
 	shard.rotation = angle
 	shard.scale = scale_value
-	shard.modulate = Color(0.62, 1.0, 0.52, 0.48)
+	shard.modulate = Color(1.0, 0.42, 0.78, 0.48) if is_witch else Color(0.62, 1.0, 0.52, 0.48)
 	get_tree().current_scene.add_child(shard)
 	var tween := shard.create_tween()
 	tween.parallel().tween_property(shard, "scale", scale_value * Vector2(1.55, 0.9), 0.18)
@@ -222,10 +276,10 @@ func _spawn_wizard_trail_shard(position: Vector2, angle: float, scale_value: Vec
 
 
 func _spawn_impact_flash(position: Vector2) -> void:
-	if is_wizard:
+	if is_wizard or is_witch:
 		var fx := Node2D.new()
 		fx.global_position = position
-		fx.modulate = Color(0.72, 1.0, 0.62, 0.96)
+		fx.modulate = Color(1.0, 0.45, 0.80, 0.96) if is_witch else Color(0.72, 1.0, 0.62, 0.96)
 		get_tree().current_scene.add_child(fx)
 
 		for i in range(3):
@@ -237,7 +291,7 @@ func _spawn_impact_flash(position: Vector2) -> void:
 			shard.centered = true
 			shard.rotation = randf_range(-0.35, 0.35) + float(i) * TAU / 3.0
 			shard.scale = Vector2(0.55, 0.55) * (1.0 - float(i) * 0.12)
-			shard.modulate = Color(0.58 + float(i) * 0.08, 1.0, 0.48 + float(i) * 0.08, 0.84)
+			shard.modulate = Color(1.0, 0.38 + float(i) * 0.08, 0.72 + float(i) * 0.06, 0.84) if is_witch else Color(0.58 + float(i) * 0.08, 1.0, 0.48 + float(i) * 0.08, 0.84)
 			fx.add_child(shard)
 
 		var tween_fx := fx.create_tween()

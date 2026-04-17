@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://cts3yqlfy0l1s"
-path="res://.godot/imported/bg_forest.png-f201d05c4823a50ef8fb82eafc6198f7.ctex"
+uid="uid://c1tkb71vtvak"
+path="res://.godot/imported/catapult.png-6cc36e7673e51a8c761e0cc0c9ff992f.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://assets/environment/bg_forest.png"
-dest_files=["res://.godot/imported/bg_forest.png-f201d05c4823a50ef8fb82eafc6198f7.ctex"]
+source_file="res://assets/defenses/artillery/catapult.png"
+dest_files=["res://.godot/imported/catapult.png-6cc36e7673e51a8c761e0cc0c9ff992f.ctex"]
 
 [params]
 
