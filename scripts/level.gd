@@ -2,8 +2,36 @@ extends Node2D
 
 const ENEMY_SCENE := preload("res://scenes/Enemy.tscn")
 const ARROW_SCENE := preload("res://scenes/Arrow.tscn")
+const KNIGHT_GUARD_SCENE := preload("res://scenes/KnightGuard.tscn")
 const FLOATING_TEXT_SCRIPT := preload("res://scripts/floating_text.gd")
 const OPTIONS_PANEL_SCENE := preload("res://scenes/OptionsPanel.tscn")
+
+# --- Audio assets ---
+const SFX_ARROW_LAUNCH := preload("res://assets/audio/sfx/arrow_launch.ogg")
+const SFX_ARROW_WHISTLE := preload("res://assets/audio/sfx/arrow_whistle.mp3")
+const SFX_BEAR_TRAP := preload("res://assets/audio/sfx/bear_trap_clamp.ogg")
+const SFX_GOBLIN_DEATH := preload("res://assets/audio/sfx/goblin_death.ogg")
+const SFX_CANNON_FIRE := preload("res://assets/audio/sfx/cannon_fire.ogg")
+const SFX_TURRET_CRANK := preload("res://assets/audio/sfx/turret_crank.ogg")
+
+# --- UI assets ---
+const UI_TUTORIAL_PANEL_TEX := preload("res://assets/ui/kenney_fantasy_ui_borders/panel-transparent-border-010.png")
+const UI_TUTORIAL_BTN_NORMAL_TEX := preload("res://assets/ui/kenney_fantasy_ui_borders/panel-010.png")
+const UI_TUTORIAL_BTN_HOVER_TEX := preload("res://assets/ui/kenney_fantasy_ui_borders/panel-011.png")
+const UI_TUTORIAL_BTN_PRESSED_TEX := preload("res://assets/ui/kenney_fantasy_ui_borders/panel-012.png")
+
+# --- Defense art assets ---
+const TURRET_FACE_TEX := preload("res://assets/defenses/turret/turret_face.png")
+const TURRET_BULLET_TEX := preload("res://assets/defenses/turret/turret_bullet.png")
+const BEAR_TRAP_TEX := preload("res://assets/defenses/traps/bear_trap.png")
+const FIRE_TRAP_TEX := preload("res://assets/defenses/traps/fire_trap.png")
+const ARTILLERY_TEX := preload("res://assets/defenses/artillery/artillery.png")
+
+# --- Wall art assets ---
+const WALL_LEVEL1_TEX := preload("res://assets/environment/walls/wall_level1.png")
+const WALL_LEVEL2_TEX := preload("res://assets/environment/walls/wall_level2.png")
+const WALL_LEVEL3_TEX := preload("res://assets/environment/walls/wall_level3.png")
+const WALL_BATTLEMENT_TEX := preload("res://assets/environment/walls/wall_battlement.png")
 
 const PHASE_PREP := "prep"
 const PHASE_BATTLE := "battle"
@@ -32,21 +60,24 @@ const BASE_CENTER_X := BASE_VIEWPORT_WIDTH * 0.5
 const BASE_PATH_WIDTH := 300.0
 const BASE_RIGHT_TOWER_WIDTH := 170.0
 const SETTINGS_PATH := "user://settings.cfg"
+const TURRET_IDLE_ROTATION := -PI * 0.5
 
-@export var starting_hp := 10
-@export var max_castle_hp := 15
+@export var starting_hp := 12
+@export var max_castle_hp := 16
+@export var starting_coins := 8
+@export var tutorial_enabled := true
 @export var wall_y := 90.0
 @export var wall_margin_from_bottom := 90.0
-@export var repair_cost := 5
-@export var spike_trap_cost := 6
-@export var fire_trap_cost := 8
-@export var slow_trap_cost := 9
-@export var fire_rate_upgrade_cost := 8
-@export var damage_upgrade_cost := 10
-@export var wall_upgrade_cost := 12
-@export var keep_upgrade_cost := 18
-@export var turret_build_cost := 16
-@export var catapult_build_cost := 34
+@export var repair_cost := 4
+@export var spike_trap_cost := 5
+@export var fire_trap_cost := 7
+@export var slow_trap_cost := 8
+@export var fire_rate_upgrade_cost := 7
+@export var damage_upgrade_cost := 9
+@export var wall_upgrade_cost := 11
+@export var keep_upgrade_cost := 16
+@export var turret_build_cost := 14
+@export var catapult_build_cost := 30
 @export var enemy_lane_half_width := 120.0
 @export var player_wall_offset := -24.0
 @export var lower_lane_y := 720.0
@@ -77,38 +108,29 @@ var keep_level := 1
 var turret_level := 0
 var turret_fire_timer := 0.0
 var turret_range := 240.0
-var turret_positions: Array[Vector2] = [Vector2(500, 432), Vector2(652, 432)]
-var turret_visuals: Array[Polygon2D] = []
+var turret_positions: Array[Vector2] = []  # Computed in _ready relative to wall_y
+var turret_visuals: Array[Sprite2D] = []
 var turret_range_indicators: Array[Line2D] = []
 var turret_preview_hovered := false
 var turret_target_mode := TARGET_CLOSEST
 var catapult_level := 0
 var catapult_fire_timer := 0.0
 var catapult_range := 320.0
-var catapult_position := Vector2(664, 426)
-var catapult_visual: Polygon2D
+var catapult_aoe_bonus := 0.0  # Set by GameState.apply_to_level for Alchemist
+var catapult_position := Vector2.ZERO  # Computed in _ready relative to wall_y
+var catapult_visual: Sprite2D
 var catapult_target_mode := TARGET_GROUPED
 var trap_inventory: Dictionary = {
 	TRAP_SPIKE: 0,
 	TRAP_FIRE: 0,
 	TRAP_SLOW: 0,
 }
-var battlefield_trap_points: Array[Vector2] = [
-	Vector2(162, 402),
-	Vector2(238, 396),
-	Vector2(372, 384),
-	Vector2(510, 398),
-	Vector2(646, 386),
-	Vector2(784, 400),
-	Vector2(920, 388),
-	Vector2(998, 398),
-]
+var battlefield_trap_points: Array[Vector2] = []  # Computed in _ready relative to wall_y
 var placed_traps: Array[String] = ["", "", "", "", "", "", "", ""]
 var trap_trigger_radius := 42.0
 var enemy_spawn_queue: Array = []
 var status_message := ""
 var status_message_time := 0.0
-var audio_players: Array[AudioStreamPlayer] = []
 var boss_reward_pending := false
 var trap_coverage_indicators: Array[Polygon2D] = []
 var current_shop_tab := SHOP_TAB_FORTRESS
@@ -119,15 +141,30 @@ var display_mode := "fullscreen"
 var resolution_scale := 1.0
 var options_panel
 var music_player: AudioStreamPlayer
-var music_step_time := 0.0
-var music_step_index := 0
-var music_melody := [261.63, 329.63, 392.0, 329.63, 293.66, 349.23, 440.0, 349.23]
-var music_bass := [130.81, 0.0, 146.83, 0.0, 164.81, 0.0, 146.83, 0.0]
+var sfx_players: Dictionary = {}
+var wall_body_sprites: Array[Sprite2D] = []
+var wall_pillar_sprites: Array[Sprite2D] = []
+var trap_sprites: Array[Sprite2D] = []
+var guard_home_positions: Array[Vector2] = []
+var knight_guards: Array[Node2D] = []
+var guards_container: Node2D
+var tutorial_panel: Panel
+var tutorial_title_label: Label
+var tutorial_body_label: RichTextLabel
+var tutorial_button: Button
+var tutorial_skip_button: Button
+var prompt_chip: Panel
+var message_chip: Panel
+var tutorial_pages: Array[Dictionary] = []
+var tutorial_page_index := -1
+var shown_enemy_tutorials: Dictionary = {}
 
 @onready var player = $Player
+@onready var ui_root: CanvasLayer = $UI
 @onready var enemies_container = $Enemies
 @onready var projectiles_container = $Projectiles
 @onready var enemy_spawner: Timer = $EnemySpawner
+@onready var background_fill: Polygon2D = $Background/BackgroundFill
 @onready var background_forest: TextureRect = $Background/ForestBackground
 @onready var background_path: TextureRect = $Background/Path
 @onready var support_area: Polygon2D = $SupportArea
@@ -154,6 +191,9 @@ var music_bass := [130.81, 0.0, 146.83, 0.0, 164.81, 0.0, 146.83, 0.0]
 @onready var ladder_bottom_zone: Area2D = $LadderZones/LadderBottomZone
 @onready var game_camera: Camera2D = $GameCamera
 @onready var hud_root: Control = $UI/HUD
+@onready var hud_panel: Panel = $UI/HUD/HUDPanel
+@onready var hud_stats_title: Label = $UI/HUD/StatsTitle
+@onready var hud_combat_title: Label = $UI/HUD/CombatTitle
 @onready var hp_label: Label = $UI/HUD/HPLabel
 @onready var hp_bar_fill: ColorRect = $UI/HUD/HPBarBG/HPBarFill
 @onready var coins_label: Label = $UI/HUD/CoinsLabel
@@ -212,17 +252,41 @@ func _ready() -> void:
 	randomize()
 	_setup_input_actions()
 	_setup_audio()
-	_setup_music()
 	_build_options_ui()
+	_build_tutorial_ui()
+	_build_notice_chips()
 	_load_settings()
 
+	# Apply character bonuses before reading derived values
+	GameState.apply_to_level(self)
+
 	castle_hp = starting_hp
+	coins = starting_coins
 	wall_y = 470.0
+
+	# Compute defense positions relative to wall_y
+	_refresh_defense_mount_positions()
+	# Trap points spread across the battlefield above the wall
+	var trap_y_base := wall_y - 68.0
+	battlefield_trap_points = [
+		Vector2(162, trap_y_base - 6.0),
+		Vector2(238, trap_y_base),
+		Vector2(372, trap_y_base + 12.0),
+		Vector2(510, trap_y_base - 4.0),
+		Vector2(646, trap_y_base + 10.0),
+		Vector2(784, trap_y_base - 2.0),
+		Vector2(920, trap_y_base + 8.0),
+		Vector2(998, trap_y_base - 4.0),
+	]
 
 	get_viewport().size_changed.connect(_update_responsive_layout)
 	_update_responsive_layout()
+	guards_container = Node2D.new()
+	guards_container.name = "Guards"
+	add_child(guards_container)
 	player.global_position = Vector2(ladder_bottom_zone.global_position.x, lower_lane_y)
 	player.shoot_requested.connect(_on_player_shoot_requested)
+	player.melee_impact.connect(_on_player_melee_impact)
 	_apply_player_upgrades()
 
 	enemy_spawner.timeout.connect(_on_enemy_spawner_timeout)
@@ -268,17 +332,36 @@ func _ready() -> void:
 	start_button.pressed.connect(_start_game)
 	restart_button.pressed.connect(_restart_game)
 	resume_button.pressed.connect(_toggle_pause)
+
+	# Add "Main Menu" button to pause panel
+	var pause_menu_btn := Button.new()
+	pause_menu_btn.text = "Main Menu"
+	pause_menu_btn.focus_mode = Control.FOCUS_ALL
+	pause_menu_btn.pressed.connect(_go_to_main_menu)
+	pause_vbox.add_child(pause_menu_btn)
+
+	# Add "Main Menu" button to game over panel
+	var gameover_menu_btn := Button.new()
+	gameover_menu_btn.text = "Main Menu"
+	gameover_menu_btn.focus_mode = Control.FOCUS_ALL
+	gameover_menu_btn.pressed.connect(_go_to_main_menu)
+	$UI/GameOverPanel/VBox.add_child(gameover_menu_btn)
+
 	boss_reward_button_1.pressed.connect(func(): _claim_boss_reward(BOSS_REWARD_REINFORCE))
 	boss_reward_button_2.pressed.connect(func(): _claim_boss_reward(BOSS_REWARD_SHARPEN))
 	boss_reward_button_3.pressed.connect(func(): _claim_boss_reward(BOSS_REWARD_VOLLEY))
 
+	_apply_kenney_ui_theme()
+
+	hud_root.visible = true
 	boss_bar_panel.visible = false
 	boss_reward_panel.visible = false
 	shop_dimmer.visible = false
 	shop_panel.visible = false
 	game_over_panel.visible = false
 	pause_panel.visible = false
-	main_menu_panel.visible = true
+	# Skip the built-in menu if launched from MainMenu scene
+	main_menu_panel.visible = false
 	if options_panel != null:
 		options_panel.visible = false
 	message_label.visible = false
@@ -288,9 +371,106 @@ func _ready() -> void:
 	_build_trap_coverage_indicators()
 	_build_turret_visual()
 	_build_catapult_visual()
+	_build_wall_sprites()
+	_build_trap_sprites()
+	# Hide old polygon battlements — wall sprites now handle the visual
+	wall_battlements.visible = false
 	_update_castle_visuals()
 	_start_prep_phase()
-	get_tree().paused = true
+	# Game starts immediately — MainMenu scene handles the pre-game flow
+	get_tree().paused = false
+	battle_started = false
+	_set_status_message("Prepare your defenses.", 1.5)
+	_show_intro_tutorial()
+
+
+func _refresh_defense_mount_positions() -> void:
+	var center_x := get_viewport_rect().size.x * 0.5
+	turret_positions = [
+		Vector2(center_x - 76.0, wall_y - 38.0),
+		Vector2(center_x + 76.0, wall_y - 38.0),
+	]
+	catapult_position = Vector2(center_x + 88.0, wall_y - 44.0)
+
+
+func _refresh_guard_home_positions() -> void:
+	var center_x := get_viewport_rect().size.x * 0.5
+	var guard_y := wall_y - 28.0 - float(max(wall_level - 1, 0)) * 6.0
+	guard_home_positions = [
+		Vector2(center_x - 52.0, guard_y),
+		Vector2(center_x + 52.0, guard_y),
+		Vector2(center_x - 104.0, guard_y + 4.0),
+		Vector2(center_x + 104.0, guard_y + 4.0),
+		Vector2(center_x - 156.0, guard_y + 10.0),
+		Vector2(center_x + 156.0, guard_y + 10.0),
+	]
+
+
+func _get_knight_guard_target_count() -> int:
+	return min(2 + max(wall_level - 1, 0), guard_home_positions.size())
+
+
+func _get_active_knight_guard_count() -> int:
+	var count := 0
+	for guard in knight_guards:
+		if is_instance_valid(guard):
+			count += 1
+	return count
+
+
+func _sync_knight_guards(reset_stats: bool = true) -> void:
+	if guards_container == null:
+		return
+
+	_refresh_guard_home_positions()
+
+	var valid_guards: Array[Node2D] = []
+	for guard in knight_guards:
+		if is_instance_valid(guard):
+			valid_guards.append(guard)
+	knight_guards = valid_guards
+
+	var target_count := _get_knight_guard_target_count()
+	while knight_guards.size() < target_count:
+		var guard: Node2D = KNIGHT_GUARD_SCENE.instantiate()
+		guards_container.add_child(guard)
+		knight_guards.append(guard)
+	while knight_guards.size() > target_count:
+		var extra_guard: Node2D = knight_guards.pop_back() as Node2D
+		if is_instance_valid(extra_guard):
+			extra_guard.queue_free()
+
+	for i in range(knight_guards.size()):
+		var guard: Node2D = knight_guards[i] as Node2D
+		if not is_instance_valid(guard):
+			continue
+		var home_position := guard_home_positions[i] if i < guard_home_positions.size() else Vector2(get_viewport_rect().size.x * 0.5, wall_y - 28.0)
+		if guard.has_method("set_home_position"):
+			guard.call("set_home_position", home_position)
+		if guard.has_method("set_battle_active"):
+			guard.call("set_battle_active", current_phase == PHASE_BATTLE and not is_game_over)
+		if reset_stats and guard.has_method("configure"):
+			guard.call("configure", {
+				"guard_index": i,
+				"home_position": home_position,
+				"battle_active": current_phase == PHASE_BATTLE and not is_game_over,
+				"speed": 138.0 + float(min(wall_level - 1, 4)) * 5.0,
+				"attack_damage": 2 + int((wall_level - 1) / 2) + int((wave_index - 1) / 6),
+				"max_health": 5 + wall_level + max(keep_level - 1, 0),
+				"attack_cooldown": max(0.62, 0.92 - float(wall_level - 1) * 0.03),
+				"attack_range": 28.0,
+				"slash_radius": 44.0 + float(min(wall_level - 1, 3)) * 3.0,
+				"leash_range": 250.0 + float(min(wall_level - 1, 5)) * 26.0,
+				"contact_damage_interval": max(0.75, 1.15 - float(min(wave_index, 8)) * 0.03),
+				"visual_scale": 1.45,
+			})
+
+
+func _apply_player_upper_lane_bounds(viewport_size: Vector2) -> void:
+	if GameState.is_battlefield_character() and current_phase == PHASE_BATTLE:
+		player.set_free_move_bounds(120.0, viewport_size.x - 120.0, 110.0, player.wall_y + 10.0)
+	else:
+		player.set_lane(player.wall_y, 170.0, viewport_size.x - 170.0)
 
 
 func _update_responsive_layout() -> void:
@@ -299,49 +479,53 @@ func _update_responsive_layout() -> void:
 	var right_edge := viewport_size.x
 	var right_tower_left := right_edge - BASE_RIGHT_TOWER_WIDTH
 
+	_refresh_defense_mount_positions()
+	_refresh_guard_home_positions()
+	if guards_container != null:
+		_sync_knight_guards(false)
+
+	# Derived Y positions relative to wall_y (470)
+	var wall_bottom := wall_y + 70.0          # 540 — bottom of wall band
+	var wall_shadow_bottom := wall_bottom + 26.0  # 566
+
+	# --- Background ---
+	background_fill.polygon = PackedVector2Array([
+		Vector2(0.0, 0.0), Vector2(right_edge, 0.0),
+		Vector2(right_edge, wall_bottom), Vector2(0.0, wall_bottom)
+	])
 	background_forest.offset_right = right_edge
-	background_forest.offset_bottom = 648.0
+	background_forest.offset_bottom = wall_bottom
 	background_path.offset_left = center_x - BASE_PATH_WIDTH * 0.5
 	background_path.offset_right = center_x + BASE_PATH_WIDTH * 0.5
-	background_path.offset_bottom = 648.0
+	background_path.offset_bottom = wall_bottom
 
-	support_area.polygon = PackedVector2Array([
-		Vector2(0.0, 540.0),
-		Vector2(right_edge, 540.0),
-		Vector2(right_edge, BASE_VIEWPORT_HEIGHT),
-		Vector2(0.0, BASE_VIEWPORT_HEIGHT)
-	])
-	back_yard_boundary.polygon = PackedVector2Array([
-		Vector2(0.0, 840.0),
-		Vector2(right_edge, 840.0),
-		Vector2(right_edge, BASE_VIEWPORT_HEIGHT),
-		Vector2(0.0, BASE_VIEWPORT_HEIGHT)
-	])
-	wall_front_shadow.polygon = PackedVector2Array([
-		Vector2(0.0, 540.0),
-		Vector2(right_edge, 540.0),
-		Vector2(right_edge, 566.0),
-		Vector2(0.0, 566.0)
-	])
+	# --- Terrain polygons (all relative to wall_y) ---
 	castle_wall_band.polygon = PackedVector2Array([
-		Vector2(0.0, wall_y),
-		Vector2(right_edge, wall_y),
-		Vector2(right_edge, wall_y + 70.0),
-		Vector2(0.0, wall_y + 70.0)
+		Vector2(0.0, wall_y), Vector2(right_edge, wall_y),
+		Vector2(right_edge, wall_bottom), Vector2(0.0, wall_bottom)
 	])
 	wall_highlight.polygon = PackedVector2Array([
-		Vector2(0.0, 470.0),
-		Vector2(right_edge, 470.0),
-		Vector2(right_edge, 490.0),
-		Vector2(0.0, 490.0)
+		Vector2(0.0, wall_y), Vector2(right_edge, wall_y),
+		Vector2(right_edge, wall_y + 20.0), Vector2(0.0, wall_y + 20.0)
 	])
 	wall_mid_shadow.polygon = PackedVector2Array([
-		Vector2(0.0, 500.0),
-		Vector2(right_edge, 500.0),
-		Vector2(right_edge, 520.0),
-		Vector2(0.0, 520.0)
+		Vector2(0.0, wall_y + 30.0), Vector2(right_edge, wall_y + 30.0),
+		Vector2(right_edge, wall_y + 50.0), Vector2(0.0, wall_y + 50.0)
+	])
+	support_area.polygon = PackedVector2Array([
+		Vector2(0.0, wall_bottom), Vector2(right_edge, wall_bottom),
+		Vector2(right_edge, BASE_VIEWPORT_HEIGHT), Vector2(0.0, BASE_VIEWPORT_HEIGHT)
+	])
+	wall_front_shadow.polygon = PackedVector2Array([
+		Vector2(0.0, wall_bottom), Vector2(right_edge, wall_bottom),
+		Vector2(right_edge, wall_shadow_bottom), Vector2(0.0, wall_shadow_bottom)
+	])
+	back_yard_boundary.polygon = PackedVector2Array([
+		Vector2(0.0, 840.0), Vector2(right_edge, 840.0),
+		Vector2(right_edge, BASE_VIEWPORT_HEIGHT), Vector2(0.0, BASE_VIEWPORT_HEIGHT)
 	])
 
+	# --- Center-aligned elements ---
 	lane_marker.position.x = center_x
 	wall_camera_focus.position.x = center_x
 	back_area_camera_focus.position.x = center_x
@@ -349,70 +533,162 @@ func _update_responsive_layout() -> void:
 	ladder.position.x = center_x
 	ladder_top_zone.position.x = center_x
 	ladder_bottom_zone.position.x = center_x
-	wall_battlements.scale.x = right_edge / BASE_VIEWPORT_WIDTH
 
+	# --- Right tower ---
 	right_tower.polygon = PackedVector2Array([
-		Vector2(right_tower_left, 180.0),
-		Vector2(right_edge, 180.0),
-		Vector2(right_edge, BASE_VIEWPORT_HEIGHT),
-		Vector2(right_tower_left, BASE_VIEWPORT_HEIGHT)
+		Vector2(right_tower_left, 180.0), Vector2(right_edge, 180.0),
+		Vector2(right_edge, BASE_VIEWPORT_HEIGHT), Vector2(right_tower_left, BASE_VIEWPORT_HEIGHT)
 	])
 	right_tower_cap.polygon = PackedVector2Array([
-		Vector2(right_tower_left, 160.0),
-		Vector2(right_edge, 160.0),
-		Vector2(right_edge, 210.0),
-		Vector2(right_tower_left, 210.0)
+		Vector2(right_tower_left, 160.0), Vector2(right_edge, 160.0),
+		Vector2(right_edge, 210.0), Vector2(right_tower_left, 210.0)
 	])
 	right_tower_highlight.polygon = PackedVector2Array([
-		Vector2(right_tower_left + 18.0, 190.0),
-		Vector2(right_tower_left + 62.0, 190.0),
-		Vector2(right_tower_left + 62.0, BASE_VIEWPORT_HEIGHT),
-		Vector2(right_tower_left + 18.0, BASE_VIEWPORT_HEIGHT)
+		Vector2(right_tower_left + 18.0, 190.0), Vector2(right_tower_left + 62.0, 190.0),
+		Vector2(right_tower_left + 62.0, BASE_VIEWPORT_HEIGHT), Vector2(right_tower_left + 18.0, BASE_VIEWPORT_HEIGHT)
 	])
 	right_tower_window.polygon = PackedVector2Array([
-		Vector2(right_tower_left + 86.0, 620.0),
-		Vector2(right_tower_left + 126.0, 620.0),
-		Vector2(right_tower_left + 126.0, 698.0),
-		Vector2(right_tower_left + 86.0, 698.0)
+		Vector2(right_tower_left + 86.0, 620.0), Vector2(right_tower_left + 126.0, 620.0),
+		Vector2(right_tower_left + 126.0, 698.0), Vector2(right_tower_left + 86.0, 698.0)
 	])
 	right_tower_window_glow.polygon = PackedVector2Array([
-		Vector2(right_tower_left + 92.0, 632.0),
-		Vector2(right_tower_left + 120.0, 632.0),
-		Vector2(right_tower_left + 120.0, 686.0),
-		Vector2(right_tower_left + 92.0, 686.0)
+		Vector2(right_tower_left + 92.0, 632.0), Vector2(right_tower_left + 120.0, 632.0),
+		Vector2(right_tower_left + 120.0, 686.0), Vector2(right_tower_left + 92.0, 686.0)
 	])
 
+	# --- Player ---
 	player.wall_y = wall_y + player_wall_offset
 	player.left_bound = 170.0
 	player.right_bound = viewport_size.x - 170.0
 	if player_is_on_lower_lane:
 		player.set_free_move_bounds(80.0, viewport_size.x - 80.0, lower_area_top_y, lower_area_bottom_y)
 	else:
-		player.set_lane(player.wall_y, 170.0, viewport_size.x - 170.0)
+		_apply_player_upper_lane_bounds(viewport_size)
 	player.global_position.x = clamp(player.global_position.x, player.left_bound, player.right_bound)
 
+	# --- Camera & shop ---
 	shop_zone.global_position = shop_marker.global_position
 	game_camera.limit_right = int(right_edge)
 	game_camera.limit_bottom = int(BASE_VIEWPORT_HEIGHT)
 	if not is_ladder_transitioning:
 		game_camera.global_position = back_area_camera_focus.global_position if player_is_on_lower_lane else wall_camera_focus.global_position
 
+	# --- Wall sprites (only rebuild if already initialized) ---
+	if not wall_body_sprites.is_empty() or not wall_pillar_sprites.is_empty():
+		_build_wall_sprites()
+
+	if not turret_visuals.is_empty():
+		_update_turret_visual()
+	if catapult_visual != null and is_instance_valid(catapult_visual):
+		_update_catapult_visual()
+
+	# --- UI panels ---
 	_set_centered_control_rect(prompt_label, 820.0, min(652.0, viewport_size.x - 80.0), 36.0)
 	_set_centered_control_rect(message_label, 120.0, min(600.0, viewport_size.x - 80.0), 34.0)
+	_sync_label_chip(prompt_label, prompt_chip, 14.0, 8.0)
+	_sync_label_chip(message_label, message_chip, 14.0, 8.0)
 	_set_centered_control_rect(boss_bar_panel, 10.0, min(600.0, viewport_size.x - 120.0), 40.0)
 	_set_centered_control_rect(wave_banner, 52.0, min(520.0, viewport_size.x - 120.0), 66.0)
-	_set_centered_control_rect(boss_reward_panel, 170.0, 420.0, 220.0)
-	_set_centered_control_rect(shop_panel, 62.0, 516.0, 586.0)
-	_set_centered_control_rect(main_menu_panel, 180.0, 320.0, 210.0)
-	_set_centered_control_rect(pause_panel, 180.0, 320.0, 210.0)
-	_set_centered_control_rect(game_over_panel, 200.0, 300.0, 150.0)
+	_set_centered_control_rect(boss_reward_panel, 160.0, min(520.0, viewport_size.x - 60.0), 240.0)
+	_set_centered_control_rect(shop_panel, 52.0, min(620.0, viewport_size.x - 40.0), min(680.0, viewport_size.y - 80.0))
+	_set_centered_control_rect(main_menu_panel, 170.0, min(360.0, viewport_size.x - 80.0), 230.0)
+	_set_centered_control_rect(pause_panel, 170.0, min(360.0, viewport_size.x - 80.0), 250.0)
+	_set_centered_control_rect(game_over_panel, 190.0, min(360.0, viewport_size.x - 80.0), 230.0)
 	if options_panel != null:
-		_set_centered_control_rect(options_panel, 150.0, 380.0, 260.0)
+		_set_centered_control_rect(options_panel, 130.0, min(460.0, viewport_size.x - 80.0), min(420.0, viewport_size.y - 120.0))
+	if tutorial_panel != null:
+		_set_centered_control_rect(tutorial_panel, 120.0, min(620.0, viewport_size.x - 60.0), min(360.0, viewport_size.y - 120.0))
+
+	_apply_ui_layout_polish(viewport_size)
 
 
 func _set_centered_control_rect(control: Control, y: float, width: float, height: float) -> void:
 	control.position = Vector2(get_viewport_rect().size.x * 0.5 - width * 0.5, y)
 	control.size = Vector2(width, height)
+
+
+func _build_notice_chips() -> void:
+	prompt_chip = Panel.new()
+	prompt_chip.visible = false
+	prompt_chip.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	prompt_chip.z_index = 19
+	ui_root.add_child(prompt_chip)
+
+	message_chip = Panel.new()
+	message_chip.visible = false
+	message_chip.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	message_chip.z_index = 19
+	ui_root.add_child(message_chip)
+
+	prompt_label.z_index = 20
+	message_label.z_index = 20
+
+
+func _sync_label_chip(label: Control, chip: Panel, pad_x: float = 14.0, pad_y: float = 8.0) -> void:
+	if chip == null:
+		return
+	chip.position = label.position - Vector2(pad_x, pad_y)
+	chip.size = label.size + Vector2(pad_x * 2.0, pad_y * 2.0)
+
+
+func _apply_ui_layout_polish(viewport_size: Vector2) -> void:
+	# Make fixed-offset shop children follow panel size to avoid clipping.
+	var shop_shadow: Control = $UI/ShopPanel/ShopShadow
+	var shop_backdrop: Control = $UI/ShopPanel/ShopBackdrop
+	var shop_inner_shade: Control = $UI/ShopPanel/ShopInnerShade
+	var shop_top_accent: Control = $UI/ShopPanel/ShopTopAccent
+	var shop_divider_1: Control = $UI/ShopPanel/ShopDivider1
+	var shop_divider_2: Control = $UI/ShopPanel/ShopDivider2
+	var shop_vbox: VBoxContainer = $UI/ShopPanel/VBoxContainer
+	var shop_info_panel: Panel = $UI/ShopPanel/VBoxContainer/InfoPanel
+
+	shop_shadow.offset_right = shop_panel.size.x - 4.0
+	shop_shadow.offset_bottom = shop_panel.size.y - 4.0
+	shop_backdrop.offset_right = shop_panel.size.x - 8.0
+	shop_backdrop.offset_bottom = shop_panel.size.y - 8.0
+	shop_inner_shade.offset_right = shop_panel.size.x - 18.0
+	shop_inner_shade.offset_bottom = shop_panel.size.y - 18.0
+	shop_top_accent.offset_right = shop_panel.size.x - 18.0
+	shop_divider_1.offset_right = shop_panel.size.x - 28.0
+	shop_divider_2.offset_right = shop_panel.size.x - 28.0
+	shop_vbox.offset_right = shop_panel.size.x - 28.0
+	shop_vbox.offset_bottom = shop_panel.size.y - 20.0
+
+	# Responsive text sizing for small widths.
+	var compact_ui := viewport_size.x < 1120.0
+	var shop_font := 15 if compact_ui else 16
+	var small_shop_font := 13 if compact_ui else 14
+	for b in [
+		wall_upgrade_button, keep_upgrade_button, turret_button, catapult_button,
+		repair_button, fire_rate_button, damage_button, trap_button, fire_trap_button, slow_trap_button, close_button
+	]:
+		b.add_theme_font_size_override("font_size", shop_font)
+		b.custom_minimum_size.y = 42
+	for b in [fortress_tab_button, defenses_tab_button, tactics_tab_button, traps_tab_button, turret_mode_button, catapult_mode_button]:
+		b.add_theme_font_size_override("font_size", small_shop_font)
+
+	if compact_ui:
+		shop_info_panel.custom_minimum_size.y = 102
+		shop_info_body_label.add_theme_font_size_override("font_size", 14)
+	else:
+		shop_info_panel.custom_minimum_size.y = 92
+		shop_info_body_label.add_theme_font_size_override("font_size", 15)
+
+	# HUD and combat text scale for smaller displays.
+	var hud_compact := viewport_size.x < 1080.0
+	hud_root.scale = Vector2(0.94, 0.94) if hud_compact else Vector2.ONE
+	hud_root.position = Vector2(12.0, 8.0) if hud_compact else Vector2(16.0, 10.0)
+
+	for label in [hp_label, coins_label, score_label, wave_label, phase_label, trap_label]:
+		label.add_theme_font_size_override("font_size", 14 if hud_compact else 15)
+	hud_stats_title.add_theme_font_size_override("font_size", 17 if hud_compact else 18)
+	hud_combat_title.add_theme_font_size_override("font_size", 17 if hud_compact else 18)
+	prompt_label.add_theme_font_size_override("font_size", 18 if hud_compact else 20)
+	message_label.add_theme_font_size_override("font_size", 16 if hud_compact else 18)
+	wave_banner.add_theme_font_size_override("font_size", 27 if hud_compact else 30)
+
+	# Keep vertical spacing readable when many controls are present.
+	shop_vbox.add_theme_constant_override("separation", 7 if compact_ui else 8)
 
 
 func _process(delta: float) -> void:
@@ -427,6 +703,8 @@ func _process(delta: float) -> void:
 			message_label.text = ""
 	else:
 		message_label.visible = false
+	if message_chip != null:
+		message_chip.visible = message_label.visible
 
 	if current_phase == PHASE_PREP and battle_started:
 		prep_time_remaining = max(prep_time_remaining - delta, 0.0)
@@ -449,6 +727,8 @@ func _process(delta: float) -> void:
 
 	_update_hud()
 	_update_prompt()
+	if prompt_chip != null:
+		prompt_chip.visible = prompt_label.visible
 	_update_trap_coverage_indicators()
 	_update_boss_ui()
 
@@ -464,7 +744,13 @@ func _start_game() -> void:
 
 
 func _restart_game() -> void:
+	get_tree().paused = false
 	get_tree().reload_current_scene()
+
+
+func _go_to_main_menu() -> void:
+	get_tree().paused = false
+	get_tree().change_scene_to_file("res://scenes/MainMenu.tscn")
 
 
 func _toggle_pause() -> void:
@@ -529,6 +815,9 @@ func _start_prep_phase() -> void:
 	enemy_spawn_queue.clear()
 	enemies_to_spawn = 0
 	enemy_spawner.stop()
+	_sync_knight_guards(true)
+	if not player_is_on_lower_lane:
+		_apply_player_upper_lane_bounds(get_viewport_rect().size)
 	_refresh_shop_buttons()
 	_update_turret_visual()
 	_update_hud()
@@ -543,76 +832,114 @@ func _begin_next_wave() -> void:
 	wave_index += 1
 	enemy_spawn_queue = _build_wave_queue(wave_index)
 	enemies_to_spawn = enemy_spawn_queue.size()
+	_sync_knight_guards(true)
 	_refresh_shop_buttons()
 	_update_turret_visual()
-	_show_wave_banner("Boss Wave %d" % wave_index if wave_index % 5 == 0 else "Wave %d Start" % wave_index)
+	var wave_banner_text: String = "Wave %d Start" % wave_index
+	if wave_index % 5 == 0:
+		wave_banner_text = "MECHA-STONE GOLEM" if _get_boss_enemy_type(wave_index) == "mecha_boss" else "Boss Wave %d" % wave_index
+	_show_wave_banner(wave_banner_text)
 	_play_sound("wave_start")
-	_set_status_message(_get_wave_hint(wave_index), 1.6)
+	_set_status_message(_get_wave_hint(wave_index), 2.2)
 	_set_next_spawn_time()
+	if not player_is_on_lower_lane:
+		_apply_player_upper_lane_bounds(get_viewport_rect().size)
 	_update_hud()
 
 
 func _build_wave_queue(target_wave: int) -> Array:
+	match target_wave:
+		1:
+			return ["grunt", "grunt", "grunt", "grunt"]
+		2:
+			return ["grunt", "grunt", "grunt", "runner", "grunt"]
+		3:
+			return ["grunt", "grunt", "runner", "grunt", "ranged", "grunt"]
+		4:
+			return ["grunt", "grunt", "runner", "ranged", "shield", "grunt", "grunt"]
+		5:
+			return ["grunt", "grunt", "runner", "ranged", "shield", _get_boss_enemy_type(target_wave)]
+		6:
+			return ["grunt", "runner", "ranged", "shield", "tank", "grunt", "grunt", "grunt"]
+		7:
+			return ["grunt", "runner", "ranged", "shield", "tank", "armored", "grunt", "grunt", "grunt"]
+
 	var queue: Array = []
-	var total := 5 + target_wave * 2
+	var total := 4 + int(target_wave * 1.5)
 	for i in range(total):
 		queue.append("grunt")
 
-	if target_wave >= 2:
-		for i in range(1 + int(target_wave / 3)):
-			queue[randi() % queue.size()] = "runner"
+	_replace_random_enemy_types(queue, "runner", 1 + int(target_wave / 4))
+	_replace_random_enemy_types(queue, "ranged", 1 + int((target_wave - 1) / 4))
+	_replace_random_enemy_types(queue, "shield", int((target_wave - 2) / 4))
+	_replace_random_enemy_types(queue, "tank", int((target_wave - 3) / 5))
+	_replace_random_enemy_types(queue, "armored", int((target_wave - 4) / 5))
 
-	if target_wave >= 3:
-		for i in range(1 + int(target_wave / 4)):
-			queue[randi() % queue.size()] = "ranged"
-
-	if target_wave >= 4:
-		for i in range(1 + int(target_wave / 4)):
-			queue[randi() % queue.size()] = "tank"
-
-	if target_wave >= 4:
-		for i in range(1 + int(target_wave / 5)):
-			queue[randi() % queue.size()] = "shield"
-
-	if target_wave >= 6:
-		for i in range(1 + int(target_wave / 5)):
-			queue[randi() % queue.size()] = "armored"
-
-	if target_wave >= 3:
-		var elite_count := 1 + int(target_wave / 6)
-		for i in range(min(elite_count, queue.size())):
+	if target_wave >= 8:
+		var elite_count: int = min(1 + int((target_wave - 8) / 3), max(queue.size() - 2, 1))
+		for i in range(elite_count):
 			var index := randi() % queue.size()
-			if queue[index] != "boss":
-				queue[index] = "elite_" + str(queue[index])
+			var queued_enemy_type: String = str(queue[index])
+			if queued_enemy_type != "boss" and queued_enemy_type != "mecha_boss":
+				queue[index] = "elite_" + queued_enemy_type
 
 	if target_wave % 5 == 0:
-		queue.append("boss")
-		queue.append("ranged")
-		queue.append("runner")
+		queue.append(_get_boss_enemy_type(target_wave))
+		queue.append("grunt")
 
 	queue.shuffle()
 	return queue
 
 
+func _replace_random_enemy_types(queue: Array, enemy_type: String, count: int) -> void:
+	for i in range(max(count, 0)):
+		if queue.is_empty():
+			return
+		queue[randi() % queue.size()] = enemy_type
+
+
+func _get_boss_enemy_type(target_wave: int) -> String:
+	var boss_phase_index: int = int(target_wave / 5)
+	return "mecha_boss" if boss_phase_index % 2 == 0 else "boss"
+
+
 func _get_wave_hint(target_wave: int) -> String:
+	match target_wave:
+		1:
+			return "Wave 1: basic goblins only. Learn the ladder and bow."
+		2:
+			return "Wave 2: runners are fast, but they go down quickly."
+		3:
+			return "Wave 3: raiders stop early and shoot the wall. Focus them first."
+		4:
+			return "Wave 4: shield bearers can block a few hits before taking damage."
+		5:
+			return "Boss wave: the war chief is coming with a small escort."
+		6:
+			return "Wave 6: tanks are slow but sturdy. Keep firing."
+		7:
+			return "Wave 7: armored goblins reduce damage from weak hits."
+	if target_wave % 10 == 0:
+		return "Boss wave: the Mecha-Stone Golem is charging its laser barrage."
 	if target_wave % 5 == 0:
-		return "Boss wave! A war chief is leading the assault."
-	if target_wave >= 6:
-		return "Mixed wave incoming: runners, ranged, shield, tank, and armored enemies."
-	if target_wave >= 4:
-		return "Shield bearers are joining the assault."
-	if target_wave >= 3:
-		return "Ranged raiders spotted behind the front line."
-	if target_wave >= 2:
-		return "Runner goblins incoming. Keep a slow trap ready."
-	return "First wave. Hold the wall."
+		return "Boss wave! Strengthen the wall before the next assault."
+	return "Mixed wave incoming. Use the shop between waves to stay ahead."
 
 
 func _set_next_spawn_time() -> void:
 	if current_phase != PHASE_BATTLE or enemies_to_spawn <= 0:
 		return
 
-	enemy_spawner.wait_time = max(0.32, 1.12 - wave_index * 0.05)
+	if wave_index <= 1:
+		enemy_spawner.wait_time = 1.55
+	elif wave_index == 2:
+		enemy_spawner.wait_time = 1.4
+	elif wave_index == 3:
+		enemy_spawner.wait_time = 1.28
+	elif wave_index == 4:
+		enemy_spawner.wait_time = 1.18
+	else:
+		enemy_spawner.wait_time = max(0.5, 1.15 - wave_index * 0.035)
 	enemy_spawner.start()
 
 
@@ -660,93 +987,111 @@ func _spawn_enemy() -> void:
 			definition["stop_distance"] = 22.0
 		if enemy_type == "boss":
 			definition["stop_distance"] = 28.0
+		if enemy_type == "mecha_boss":
+			definition["stop_distance"] = 34.0
 		if is_elite:
 			definition = _make_elite_enemy(definition)
 		enemy.configure(definition)
+		_show_enemy_tutorial(enemy_type)
 
 
 func _get_enemy_definition(enemy_type: String) -> Dictionary:
-	var base_speed := 84.0 + float(max(wave_index - 1, 0)) * 6.0
-	var base_hp := 1 + int((wave_index - 1) / 3)
+	var base_speed := 72.0 + float(max(wave_index - 1, 0)) * 4.5
+	var base_hp := 1 + int((wave_index - 1) / 4)
 	var base_reward := 1 + int((wave_index - 1) / 2)
 
 	match enemy_type:
 		"runner":
 			return {
 				"enemy_type": "runner",
-				"speed": base_speed + 34.0,
+				"speed": base_speed + 26.0,
 				"max_health": max(1, base_hp),
 				"coin_reward": base_reward,
 				"castle_damage": 1,
 				"armor": 0,
 				"scale": 0.88,
 				"tint": Color(0.82, 1.0, 0.86, 1.0),
-				"burst_speed_multiplier": 1.7,
-				"burst_duration": 0.42,
-				"burst_cooldown": 0.85
+				"burst_speed_multiplier": 1.45,
+				"burst_duration": 0.32,
+				"burst_cooldown": 1.1
 			}
 		"ranged":
 			return {
 				"enemy_type": "ranged",
-				"speed": max(58.0, base_speed - 8.0),
-				"max_health": base_hp + 1,
+				"speed": max(50.0, base_speed - 12.0),
+				"max_health": base_hp,
 				"coin_reward": base_reward + 1,
 				"castle_damage": 1,
 				"armor": 0,
-				"scale": 1.0,
+				"scale": 0.96,
 				"tint": Color(0.96, 0.92, 0.7, 1.0),
 				"attack_mode": "ranged",
-				"attack_interval": max(0.75, 1.45 - wave_index * 0.03),
-				"attack_line_y": wall_y - 130.0
+				"attack_interval": max(1.15, 2.0 - wave_index * 0.02),
+				"attack_line_y": wall_y - 108.0
 			}
 		"tank":
 			return {
 				"enemy_type": "tank",
-				"speed": max(55.0, base_speed - 20.0),
-				"max_health": base_hp + 3,
+				"speed": max(46.0, base_speed - 18.0),
+				"max_health": base_hp + 2,
 				"coin_reward": base_reward + 2,
 				"castle_damage": 2,
 				"armor": 0,
-				"scale": 1.3,
+				"scale": 1.24,
 				"tint": Color(1.0, 0.86, 0.8, 1.0)
 			}
 		"shield":
 			return {
 				"enemy_type": "shield",
-				"speed": max(60.0, base_speed - 10.0),
-				"max_health": base_hp + 2,
-				"coin_reward": base_reward + 2,
-				"castle_damage": 2,
+				"speed": max(54.0, base_speed - 10.0),
+				"max_health": base_hp + 1,
+				"coin_reward": base_reward + 1,
+				"castle_damage": 1,
 				"armor": 0,
-				"shield_points": 2 + int(wave_index / 6),
-				"scale": 1.15,
+				"shield_points": 1 + int(wave_index / 7),
+				"scale": 1.12,
 				"tint": Color(0.85, 0.92, 1.0, 1.0)
 			}
 		"armored":
 			return {
 				"enemy_type": "armored",
-				"speed": max(62.0, base_speed - 6.0),
+				"speed": max(54.0, base_speed - 8.0),
 				"max_health": base_hp + 1,
 				"coin_reward": base_reward + 1,
 				"castle_damage": 1,
 				"armor": 1,
-				"scale": 1.08,
+				"scale": 1.06,
 				"tint": Color(0.8, 0.9, 1.0, 1.0)
 			}
 		"boss":
 			return {
 				"enemy_type": "boss",
-				"speed": max(52.0, base_speed - 18.0),
-				"max_health": 10 + wave_index * 2,
-				"coin_reward": 10 + wave_index,
-				"castle_damage": 3,
-				"armor": 1 + int(wave_index / 10),
-				"scale": 1.8,
+				"speed": max(40.0, base_speed - 24.0),
+				"max_health": 7 + int(round(wave_index * 1.6)),
+				"coin_reward": 12 + wave_index,
+				"castle_damage": 2,
+				"armor": int(wave_index / 15),
+				"scale": 1.66,
 				"tint": Color(1.0, 0.72, 0.72, 1.0),
 				"elite": true,
 				"attack_mode": "ranged",
-				"attack_interval": max(0.6, 1.15 - wave_index * 0.02),
-				"attack_line_y": wall_y - 170.0
+				"attack_interval": max(1.05, 1.45 - wave_index * 0.015),
+				"attack_line_y": wall_y - 150.0
+			}
+		"mecha_boss":
+			return {
+				"enemy_type": "mecha_boss",
+				"speed": max(34.0, base_speed - 28.0),
+				"max_health": 10 + int(round(wave_index * 1.85)),
+				"coin_reward": 14 + wave_index,
+				"castle_damage": 3,
+				"armor": 1 + int(wave_index / 12),
+				"scale": 1.75,
+				"tint": Color(0.84, 0.95, 1.08, 1.0),
+				"elite": true,
+				"attack_mode": "ranged",
+				"attack_interval": max(1.2, 1.7 - wave_index * 0.012),
+				"attack_line_y": wall_y - 168.0
 			}
 		_:
 			return {
@@ -764,35 +1109,103 @@ func _get_enemy_definition(enemy_type: String) -> Dictionary:
 func _make_elite_enemy(definition: Dictionary) -> Dictionary:
 	var elite_definition: Dictionary = definition.duplicate(true)
 	elite_definition["elite"] = true
-	elite_definition["max_health"] = int(elite_definition.get("max_health", 1)) + 2
+	elite_definition["max_health"] = int(elite_definition.get("max_health", 1)) + 1
 	elite_definition["coin_reward"] = int(elite_definition.get("coin_reward", 1)) + 2
 	elite_definition["castle_damage"] = int(elite_definition.get("castle_damage", 1)) + 1
-	elite_definition["scale"] = float(elite_definition.get("scale", 1.0)) * 1.08
+	elite_definition["scale"] = float(elite_definition.get("scale", 1.0)) * 1.06
 	var tint: Color = elite_definition.get("tint", Color.WHITE)
 	elite_definition["tint"] = Color(min(tint.r + 0.08, 1.0), min(tint.g + 0.08, 1.0), min(tint.b + 0.08, 1.0), tint.a)
 	return elite_definition
+
+
+func _show_enemy_tutorial(enemy_type: String) -> void:
+	if not tutorial_enabled or shown_enemy_tutorials.has(enemy_type):
+		return
+
+	var message := ""
+	match enemy_type:
+		"runner":
+			message = "Runner goblins are quick but fragile. Pick them off fast."
+		"ranged":
+			message = "Ranged goblins stop before the wall and shoot. Focus them first."
+		"shield":
+			message = "Shield bearers block a few hits. Keep shooting to break through."
+		"tank":
+			message = "Tanks are slow and bulky. Use steady damage and traps."
+		"armored":
+			message = "Armored goblins shrug off weak hits. Upgrades help against them."
+		"boss":
+			message = "Boss incoming. Keep the wall healthy and stay on target."
+		"mecha_boss":
+			message = "The Mecha-Stone Golem is here. Watch for heavy laser hits on the wall."
+		_:
+			return
+
+	shown_enemy_tutorials[enemy_type] = true
+	_set_status_message(message, 2.8)
 
 
 func _on_player_shoot_requested(spawn_position: Vector2, target_position: Vector2) -> void:
 	if is_game_over or get_tree().paused:
 		return
 
+	var on_battlefield: bool = current_phase == PHASE_BATTLE and GameState.is_battlefield_character() and not player_is_on_lower_lane
 	if current_phase != PHASE_BATTLE or player_is_on_lower_lane:
-		return
+		if not on_battlefield:
+			return
 
 	_play_sound("shoot")
 	var arrow = ARROW_SCENE.instantiate()
 	arrow.global_position = spawn_position
+	if GameState.selected_character == GameState.CHAR_WIZARD or GameState.selected_character == GameState.CHAR_MERCHANT:
+		arrow.is_wizard = true
+	elif GameState.selected_character == GameState.CHAR_RANGER:
+		arrow.is_huntress = true
 	if arrow.has_method("set_damage"):
 		arrow.set_damage(_get_player_arrow_damage())
+	if GameState.ranger_should_pierce():
+		arrow.pierce = true
 	projectiles_container.add_child(arrow)
 
 	if arrow.has_method("set_direction"):
 		arrow.set_direction(target_position)
 
 
+func _on_player_melee_impact(pos: Vector2, radius: float) -> void:
+	var ring := Node2D.new()
+	ring.position = pos
+	ring.z_index = 10
+	add_child(ring)
+
+	var line := Line2D.new()
+	line.width = 6.0
+	line.default_color = Color(1.0, 0.65, 0.1, 1.0)
+	line.joint_mode = Line2D.LINE_JOINT_ROUND
+	var points: PackedVector2Array = []
+	var steps := 32
+	for i in range(steps + 1):
+		var angle := (float(i) / float(steps)) * TAU
+		points.append(Vector2(cos(angle), sin(angle)) * radius)
+	line.points = points
+	ring.add_child(line)
+
+	var fill := Line2D.new()
+	fill.width = radius * 2.0
+	fill.default_color = Color(1.0, 0.65, 0.1, 0.18)
+	fill.joint_mode = Line2D.LINE_JOINT_ROUND
+	fill.points = points
+	ring.add_child(fill)
+
+	var tween := create_tween()
+	tween.set_parallel(true)
+	tween.tween_property(ring, "scale", Vector2(1.5, 1.5), 0.4).set_ease(Tween.EASE_OUT)
+	tween.tween_property(line, "default_color:a", 0.0, 0.4).set_ease(Tween.EASE_OUT)
+	tween.tween_property(fill, "default_color:a", 0.0, 0.3).set_ease(Tween.EASE_OUT)
+	tween.chain().tween_callback(ring.queue_free)
+
+
 func _on_enemy_killed(reward: int) -> void:
-	coins += reward
+	coins += reward + GameState.bonus_coins_per_kill()
 	score += 10 * max(wave_index, 1)
 	enemies_alive = max(enemies_alive - 1, 0)
 	_play_sound("enemy_die")
@@ -812,9 +1225,11 @@ func _on_enemy_hit(damage_dealt: int, killed: bool, target_type: String, world_p
 		hit_color = Color(0.72, 0.88, 1.0, 1.0)
 	elif target_type == "boss":
 		hit_color = Color(1.0, 0.52, 0.52, 1.0)
+	elif target_type == "mecha_boss":
+		hit_color = Color(0.55, 0.9, 1.0, 1.0)
 	elif elite:
 		hit_color = Color(1.0, 0.8, 0.25, 1.0)
-	_spawn_floating_text(world_position, str(damage_dealt), hit_color, 24 if elite or target_type == "boss" else 20)
+	_spawn_floating_text(world_position, str(damage_dealt), hit_color, 24 if elite or target_type == "boss" or target_type == "mecha_boss" else 20)
 	if killed:
 		_spawn_floating_text(world_position + Vector2(0, -18), "KO!", Color(1.0, 0.96, 0.7, 1.0), 18, 0.55)
 		return
@@ -858,9 +1273,11 @@ func _check_wave_clear() -> void:
 
 	if enemies_to_spawn <= 0 and enemies_alive <= 0:
 		score += 50 * wave_index
+		var clear_bonus_coins := 2 + int((wave_index - 1) / 2)
+		coins += clear_bonus_coins
 		_show_wave_banner("Wave %d Cleared" % wave_index)
 		_play_sound("wave_clear")
-		_set_status_message("Prep time. Repair, upgrade, and place traps.", 1.6)
+		_set_status_message("Wave clear bonus: +%d coins. Prep time to repair and upgrade." % clear_bonus_coins, 1.8)
 		boss_reward_pending = wave_index % 5 == 0
 		_start_prep_phase()
 		if boss_reward_pending:
@@ -871,6 +1288,7 @@ func _trigger_game_over() -> void:
 	is_game_over = true
 	enemy_spawner.stop()
 	shop_panel.visible = false
+	_hide_tutorial()
 	get_tree().paused = true
 
 	if player.has_method("die"):
@@ -937,6 +1355,16 @@ func _unhandled_input(event: InputEvent) -> void:
 			get_viewport().set_input_as_handled()
 		return
 
+	if tutorial_panel != null and tutorial_panel.visible:
+		if event.is_action_pressed("ui_accept") or event.is_action_pressed("interact"):
+			_advance_tutorial()
+			get_viewport().set_input_as_handled()
+			return
+		if event.is_action_pressed("ui_cancel"):
+			_skip_tutorial()
+			get_viewport().set_input_as_handled()
+			return
+
 	if InputMap.has_action("pause") and event.is_action_pressed("pause"):
 		_toggle_pause()
 		get_viewport().set_input_as_handled()
@@ -968,6 +1396,7 @@ func _open_shop() -> void:
 	hud_root.modulate = Color(1, 1, 1, 0.3)
 	prompt_label.visible = false
 	message_label.visible = false
+	_hide_tutorial()
 	current_shop_tab = SHOP_TAB_FORTRESS
 	_refresh_shop_buttons()
 	_update_turret_visual()
@@ -1018,7 +1447,7 @@ func _toggle_ladder_lane() -> void:
 
 	if going_up:
 		player_is_on_lower_lane = false
-		player.set_lane(player.wall_y, 170.0, viewport_size.x - 170.0)
+		_apply_player_upper_lane_bounds(viewport_size)
 		player.global_position.x = ladder_top_zone.global_position.x
 		game_camera.global_position = wall_camera_focus.global_position
 		if not battle_started:
@@ -1070,7 +1499,7 @@ func _set_shop_tab(tab_name: String) -> void:
 
 
 func _on_repair_button_pressed() -> void:
-	_try_purchase(repair_cost, Callable(self, "_buy_repair"), "Wall repaired +1 HP.")
+	_try_purchase(repair_cost, Callable(self, "_buy_repair"), "Wall repaired +2 HP.")
 
 
 func _on_fire_rate_button_pressed() -> void:
@@ -1167,7 +1596,7 @@ func _try_purchase_trap(trap_type: String) -> void:
 
 
 func _buy_repair() -> void:
-	castle_hp = min(castle_hp + 1, max_castle_hp)
+	castle_hp = min(castle_hp + 2, max_castle_hp)
 
 
 func _buy_fire_rate_upgrade() -> void:
@@ -1181,16 +1610,18 @@ func _buy_damage_upgrade() -> void:
 
 func _buy_wall_upgrade() -> void:
 	wall_level += 1
-	max_castle_hp += 3
-	castle_hp = min(castle_hp + 3, max_castle_hp)
+	max_castle_hp += 4
+	castle_hp = min(castle_hp + 4, max_castle_hp)
 	_update_castle_visuals()
+	_sync_knight_guards(true)
 
 
 func _buy_keep_upgrade() -> void:
 	keep_level += 1
-	max_castle_hp += 1
-	castle_hp = min(castle_hp + 1, max_castle_hp)
+	max_castle_hp += 2
+	castle_hp = min(castle_hp + 2, max_castle_hp)
 	_update_castle_visuals()
+	_sync_knight_guards(true)
 
 
 func _buy_or_upgrade_turret() -> void:
@@ -1251,6 +1682,7 @@ func _deploy_trap_at_index(trap_index: int, trap_type: String) -> void:
 
 func _apply_player_upgrades() -> void:
 	player.fire_cooldown = max(0.08, 0.25 - fire_rate_level * 0.03)
+	player.melee_damage = 2 + damage_level
 
 
 func _get_player_arrow_damage() -> int:
@@ -1258,35 +1690,35 @@ func _get_player_arrow_damage() -> int:
 
 
 func _get_fire_rate_upgrade_cost() -> int:
-	return fire_rate_upgrade_cost + fire_rate_level * 4
+	return fire_rate_upgrade_cost + fire_rate_level * 3
 
 
 func _get_damage_upgrade_cost() -> int:
-	return damage_upgrade_cost + damage_level * 5
+	return damage_upgrade_cost + damage_level * 4
 
 
 func _get_wall_upgrade_cost() -> int:
-	return wall_upgrade_cost + (wall_level - 1) * 8
+	return wall_upgrade_cost + (wall_level - 1) * 7
 
 
 func _get_keep_upgrade_cost() -> int:
-	return keep_upgrade_cost + (keep_level - 1) * 12
+	return keep_upgrade_cost + (keep_level - 1) * 10
 
 
 func _get_turret_cost() -> int:
-	return turret_build_cost + max(turret_level - 1, 0) * 14
+	return turret_build_cost + max(turret_level - 1, 0) * 12
 
 
 func _get_catapult_cost() -> int:
-	return catapult_build_cost + max(catapult_level - 1, 0) * 18
+	return catapult_build_cost + max(catapult_level - 1, 0) * 16
 
 
 func _get_trap_cost(trap_type: String) -> int:
 	match trap_type:
 		TRAP_FIRE:
-			return fire_trap_cost + int(trap_inventory[TRAP_FIRE]) * 3
+			return fire_trap_cost + int(trap_inventory[TRAP_FIRE]) * 2
 		TRAP_SLOW:
-			return slow_trap_cost + int(trap_inventory[TRAP_SLOW]) * 3
+			return slow_trap_cost + int(trap_inventory[TRAP_SLOW]) * 2
 		_:
 			return spike_trap_cost + int(trap_inventory[TRAP_SPIKE]) * 2
 
@@ -1427,6 +1859,36 @@ func _refresh_trap_visuals() -> void:
 			continue
 		indicator.visible = false
 
+	# Update trap sprites to match placed_traps
+	for i in range(min(trap_sprites.size(), placed_traps.size())):
+		var trap_spr := trap_sprites[i]
+		if not is_instance_valid(trap_spr):
+			continue
+		var trap_type: String = str(placed_traps[i])
+		if trap_type == "":
+			trap_spr.visible = false
+		else:
+			trap_spr.visible = true
+			match trap_type:
+				TRAP_SPIKE:
+					trap_spr.texture = BEAR_TRAP_TEX
+					trap_spr.hframes = 3
+					trap_spr.vframes = 1
+					trap_spr.frame = 0
+					trap_spr.modulate = Color(1, 1, 1, 1)
+				TRAP_FIRE:
+					trap_spr.texture = FIRE_TRAP_TEX
+					trap_spr.hframes = 7
+					trap_spr.vframes = 1
+					trap_spr.frame = 3
+					trap_spr.modulate = Color(1, 1, 1, 1)
+				_:
+					trap_spr.texture = BEAR_TRAP_TEX
+					trap_spr.hframes = 3
+					trap_spr.vframes = 1
+					trap_spr.frame = 0
+					trap_spr.modulate = Color(0.6, 0.8, 1.2, 1.0)
+
 
 func _build_turret_visual() -> void:
 	for visual in turret_visuals:
@@ -1439,18 +1901,18 @@ func _build_turret_visual() -> void:
 	turret_range_indicators.clear()
 
 	for turret_position in turret_positions:
-		var turret_visual: Polygon2D = Polygon2D.new()
-		turret_visual.z_index = 8
-		turret_visual.visible = false
-		turret_visual.position = turret_position
-		turret_visual.color = Color(0.82, 0.74, 0.58, 0.96)
-		turret_visual.polygon = PackedVector2Array([
-			Vector2(-16, 12), Vector2(16, 12), Vector2(12, -4),
-			Vector2(6, -4), Vector2(6, -16), Vector2(-6, -16),
-			Vector2(-6, -4), Vector2(-12, -4)
-		])
-		add_child(turret_visual)
-		turret_visuals.append(turret_visual)
+		var turret_sprite := Sprite2D.new()
+		turret_sprite.texture = TURRET_FACE_TEX
+		turret_sprite.z_index = 8
+		turret_sprite.visible = false
+		turret_sprite.position = turret_position
+		turret_sprite.hframes = 1
+		turret_sprite.vframes = 8
+		turret_sprite.frame = 0
+		turret_sprite.rotation = TURRET_IDLE_ROTATION
+		turret_sprite.scale = Vector2(2.0, 2.0)
+		add_child(turret_sprite)
+		turret_visuals.append(turret_sprite)
 
 		var indicator: Line2D = Line2D.new()
 		indicator.z_index = 6
@@ -1468,18 +1930,104 @@ func _build_catapult_visual() -> void:
 	if catapult_visual != null and is_instance_valid(catapult_visual):
 		catapult_visual.queue_free()
 
-	catapult_visual = Polygon2D.new()
+	catapult_visual = Sprite2D.new()
+	catapult_visual.texture = ARTILLERY_TEX
 	catapult_visual.z_index = 8
 	catapult_visual.visible = false
 	catapult_visual.position = catapult_position
-	catapult_visual.color = Color(0.72, 0.56, 0.34, 0.96)
-	catapult_visual.polygon = PackedVector2Array([
-		Vector2(-18, 12), Vector2(18, 12), Vector2(12, 2), Vector2(4, 2),
-		Vector2(20, -10), Vector2(24, -22), Vector2(18, -24), Vector2(12, -12),
-		Vector2(-8, 0), Vector2(-18, 2)
-	])
+	catapult_visual.hframes = 3
+	catapult_visual.vframes = 1
+	catapult_visual.frame = 0
+	# Artillery source is 362x257 (3 frames of ~120x257). Scale to ~50px tall
+	catapult_visual.scale = Vector2(0.2, 0.2)
 	add_child(catapult_visual)
 	_update_catapult_visual()
+
+
+func _build_wall_sprites() -> void:
+	# Clear previous wall sprites
+	for spr in wall_body_sprites:
+		if is_instance_valid(spr):
+			spr.queue_free()
+	for spr in wall_pillar_sprites:
+		if is_instance_valid(spr):
+			spr.queue_free()
+	wall_body_sprites.clear()
+	wall_pillar_sprites.clear()
+
+	_layout_wall_sprites()
+
+
+func _layout_wall_sprites() -> void:
+	# Wall is built from alternating body (inbetween_wall 338x256) and pillar (wall1 128x206) segments.
+	# Target height: 90px. Anchored so bottom aligns with wall_y + 35 (center of wall band).
+	var viewport_w := get_viewport_rect().size.x
+	var wall_center_y := wall_y + 35.0  # visual center of the wall band
+
+	var body_h := 256.0
+	var body_w := 338.0
+	var body_scale := 90.0 / body_h  # ~0.35
+	var scaled_body_w := body_w * body_scale  # ~118px
+
+	var pillar_h := 206.0
+	var pillar_w := 128.0
+	var pillar_scale := 100.0 / pillar_h  # ~0.485, pillars slightly taller than body
+	var scaled_pillar_w := pillar_w * pillar_scale  # ~62px
+
+	# Build the pattern: pillar, body, pillar, body, ... pillar
+	# Calculate how many body segments we need to span the viewport
+	var segment_w := scaled_body_w + scaled_pillar_w  # ~180px per body+pillar pair
+	var num_bodies := int(ceil(viewport_w / segment_w)) + 1
+	var total_w := float(num_bodies) * scaled_body_w + float(num_bodies + 1) * scaled_pillar_w
+	var start_x := (viewport_w - total_w) * 0.5 + scaled_pillar_w * 0.5  # center the wall
+
+	var cursor_x := start_x
+
+	# Place pillars and bodies alternating
+	for i in range(num_bodies + 1):
+		# Place a pillar — texture depends on current wall_level
+		var pillar := Sprite2D.new()
+		var _ptex: Texture2D
+		match wall_level:
+			2: _ptex = WALL_LEVEL2_TEX
+			3: _ptex = WALL_LEVEL3_TEX
+			_: _ptex = WALL_LEVEL1_TEX
+		pillar.texture = _ptex
+		pillar.z_index = 6
+		pillar.scale = Vector2(pillar_scale, pillar_scale)
+		pillar.position = Vector2(cursor_x, wall_center_y)
+		add_child(pillar)
+		wall_pillar_sprites.append(pillar)
+		cursor_x += scaled_pillar_w * 0.5
+
+		if i < num_bodies:
+			# Place a body segment
+			cursor_x += scaled_body_w * 0.5
+			var body := Sprite2D.new()
+			body.texture = WALL_BATTLEMENT_TEX
+			body.z_index = 5
+			body.scale = Vector2(body_scale, body_scale)
+			body.position = Vector2(cursor_x, wall_center_y)
+			add_child(body)
+			wall_body_sprites.append(body)
+			cursor_x += scaled_body_w * 0.5 + scaled_pillar_w * 0.5
+
+
+func _build_trap_sprites() -> void:
+	# Clear old trap sprites
+	for spr in trap_sprites:
+		if is_instance_valid(spr):
+			spr.queue_free()
+	trap_sprites.clear()
+
+	for i in range(battlefield_trap_points.size()):
+		var trap_spr := Sprite2D.new()
+		trap_spr.z_index = 7
+		trap_spr.visible = false
+		trap_spr.position = battlefield_trap_points[i]
+		trap_spr.scale = Vector2(1.5, 1.5)
+		add_child(trap_spr)
+		trap_sprites.append(trap_spr)
 
 
 func _update_castle_visuals() -> void:
@@ -1487,17 +2035,6 @@ func _update_castle_visuals() -> void:
 	castle_wall_band.color = Color(0.388235 + wall_body_lighten, 0.352941 + wall_body_lighten * 0.9, 0.294118 + wall_body_lighten * 0.75, 1)
 	wall_highlight.color = Color(0.584314 + wall_body_lighten * 0.7, 0.529412 + wall_body_lighten * 0.6, 0.423529 + wall_body_lighten * 0.55, 0.45)
 	wall_mid_shadow.color = Color(0, 0, 0, max(0.08, 0.12 - float(wall_level - 1) * 0.01))
-
-	var battlement_count: int = min(14, 7 + wall_level * 2)
-	var battlement_index: int = 0
-	for child in wall_battlements.get_children():
-		var battlement := child as Polygon2D
-		if battlement == null:
-			continue
-		battlement.visible = battlement_index < battlement_count
-		battlement.position.y = -float(min(wall_level - 1, 3)) * 6.0
-		battlement.color = Color(0.690196 + wall_body_lighten * 0.5, 0.631373 + wall_body_lighten * 0.45, 0.505882 + wall_body_lighten * 0.35, 1)
-		battlement_index += 1
 
 	var keep_boost: float = min(float(keep_level - 1) * 0.05, 0.2)
 	towers.scale = Vector2.ONE * (1.0 + float(keep_level - 1) * 0.03)
@@ -1524,6 +2061,20 @@ func _update_castle_visuals() -> void:
 	_update_turret_visual()
 	_update_catapult_visual()
 
+	# Update pillar textures based on wall_level
+	var pillar_tex: Texture2D
+	match wall_level:
+		1:
+			pillar_tex = WALL_LEVEL1_TEX
+		2:
+			pillar_tex = WALL_LEVEL2_TEX
+		_:
+			pillar_tex = WALL_LEVEL3_TEX
+	for pillar in wall_pillar_sprites:
+		if is_instance_valid(pillar):
+			pillar.texture = pillar_tex
+
+
 
 func _build_circle_points(radius: float, segments: int = 32) -> PackedVector2Array:
 	var points := PackedVector2Array()
@@ -1539,16 +2090,17 @@ func _set_turret_preview_hovered(is_hovered: bool) -> void:
 
 
 func _spawn_turret_tracer(origin: Vector2, target: Vector2) -> void:
-	var tracer: Line2D = Line2D.new()
-	tracer.z_index = 18
-	tracer.width = 3.0
-	tracer.default_color = Color(1.0, 0.9, 0.55, 0.9)
-	tracer.points = PackedVector2Array([origin, target])
-	add_child(tracer)
-	var tween: Tween = tracer.create_tween()
-	tween.parallel().tween_property(tracer, "modulate", Color(1, 1, 1, 0), 0.12)
-	tween.parallel().tween_property(tracer, "width", 1.0, 0.12)
-	tween.tween_callback(tracer.queue_free)
+	var bullet := Sprite2D.new()
+	bullet.texture = TURRET_BULLET_TEX
+	bullet.z_index = 18
+	bullet.position = origin
+	bullet.scale = Vector2(2.0, 2.0)
+	bullet.rotation = (target - origin).angle()
+	add_child(bullet)
+	var tween: Tween = bullet.create_tween()
+	tween.tween_property(bullet, "position", target, 0.08)
+	tween.parallel().tween_property(bullet, "modulate", Color(1, 1, 1, 0.3), 0.08)
+	tween.tween_callback(bullet.queue_free)
 
 
 func _spawn_turret_muzzle_flash(origin: Vector2) -> void:
@@ -1608,9 +2160,8 @@ func _update_turret_visual() -> void:
 			continue
 		var mount_position: Vector2 = turret_positions[i] + Vector2(0, -float(max(wall_level - 1, 0)) * 4.0)
 		turret_visual.position = mount_position
-		turret_visual.rotation = lerp_angle(turret_visual.rotation, 0.0, 0.18)
-		turret_visual.scale = Vector2.ONE * (1.2 + float(turret_level - 1) * 0.12)
-		turret_visual.color = Color(0.9 + min(float(turret_level) * 0.03, 0.1), 0.82 + min(float(keep_level - 1) * 0.03, 0.1), 0.5, 1.0)
+		turret_visual.rotation = lerp_angle(turret_visual.rotation, TURRET_IDLE_ROTATION, 0.18)
+		turret_visual.scale = Vector2.ONE * (2.0 + float(turret_level - 1) * 0.2)
 		if i < turret_range_indicators.size() and is_instance_valid(turret_range_indicators[i]):
 			var indicator: Line2D = turret_range_indicators[i]
 			indicator.position = mount_position
@@ -1628,8 +2179,7 @@ func _update_catapult_visual() -> void:
 		return
 
 	catapult_visual.position = catapult_position + Vector2(0, -float(max(wall_level - 1, 0)) * 4.0)
-	catapult_visual.scale = Vector2.ONE * (1.0 + float(catapult_level - 1) * 0.1)
-	catapult_visual.color = Color(0.72 + min(float(catapult_level) * 0.03, 0.12), 0.56 + min(float(keep_level - 1) * 0.02, 0.06), 0.34, 0.98)
+	catapult_visual.scale = Vector2.ONE * (0.2 + float(catapult_level - 1) * 0.03)
 
 
 func _get_target_mode_display_name(mode: String) -> String:
@@ -1723,14 +2273,14 @@ func _update_turret_attack() -> void:
 		_play_sound("turret_shoot")
 		if i < turret_visuals.size() and is_instance_valid(turret_visuals[i]):
 			var turret_visual := turret_visuals[i]
-			var aim_angle: float = (target.global_position - mount_position).angle() + PI * 0.5
+			var aim_angle: float = (target.global_position - mount_position).angle()
 			turret_visual.rotation = aim_angle
-			turret_visual.scale = Vector2.ONE * (1.35 + float(turret_level - 1) * 0.14)
+			turret_visual.scale = Vector2.ONE * (2.4 + float(turret_level - 1) * 0.2)
 			turret_visual.modulate = Color(1.3, 1.15, 0.8, 1.0)
 			var tween: Tween = turret_visual.create_tween()
-			tween.parallel().tween_property(turret_visual, "scale", Vector2.ONE * (1.2 + float(turret_level - 1) * 0.12), 0.12)
+			tween.parallel().tween_property(turret_visual, "scale", Vector2.ONE * (2.0 + float(turret_level - 1) * 0.2), 0.12)
 			tween.parallel().tween_property(turret_visual, "modulate", Color(1, 1, 1, 1), 0.16)
-			tween.parallel().tween_property(turret_visual, "rotation", 0.0, 0.18)
+			tween.parallel().tween_property(turret_visual, "rotation", TURRET_IDLE_ROTATION, 0.18)
 
 	if fired:
 		turret_fire_timer = max(0.2, 0.75 - float(turret_level - 1) * 0.07)
@@ -1748,20 +2298,22 @@ func _update_catapult_attack() -> void:
 
 	var impact_point := target.global_position
 	_spawn_trap_trigger_flash(impact_point, Color(1.0, 0.58, 0.26, 0.9), 3.4)
-	_play_sound("trap_fire")
+	_play_sound("catapult_shoot")
 	for enemy in enemies_container.get_children():
 		if not is_instance_valid(enemy):
 			continue
 		if not enemy.has_method("take_damage"):
 			continue
-		if enemy.global_position.distance_to(impact_point) <= 78.0 + float(catapult_level) * 6.0:
+		if enemy.global_position.distance_to(impact_point) <= 78.0 + float(catapult_level) * 6.0 + catapult_aoe_bonus:
 			enemy.take_damage(2 + catapult_level)
 
 	catapult_fire_timer = max(1.3, 2.6 - float(catapult_level - 1) * 0.16)
 	if catapult_visual != null and is_instance_valid(catapult_visual):
-		catapult_visual.scale = Vector2.ONE * (1.12 + float(catapult_level - 1) * 0.1)
+		catapult_visual.frame = 2  # firing frame
+		catapult_visual.scale = Vector2.ONE * (0.24 + float(catapult_level - 1) * 0.03)
 		var tween: Tween = catapult_visual.create_tween()
-		tween.tween_property(catapult_visual, "scale", Vector2.ONE * (1.0 + float(catapult_level - 1) * 0.1), 0.16)
+		tween.tween_property(catapult_visual, "scale", Vector2.ONE * (0.2 + float(catapult_level - 1) * 0.03), 0.16)
+		tween.tween_callback(func(): catapult_visual.frame = 0)
 
 
 func _get_trap_icon_polygon(trap_type: String) -> PackedVector2Array:
@@ -1842,25 +2394,253 @@ func _spawn_trap_trigger_flash(position: Vector2, flash_color: Color = Color(1.0
 
 
 func _setup_audio() -> void:
-	for i in range(6):
+	var sfx_map: Dictionary = {
+		"shoot": SFX_ARROW_LAUNCH,
+		"enemy_die": SFX_GOBLIN_DEATH,
+		"trap_spike": SFX_BEAR_TRAP,
+		"turret_shoot": SFX_TURRET_CRANK,
+		"catapult_shoot": SFX_CANNON_FIRE,
+		"trap_fire": SFX_CANNON_FIRE,
+	}
+	for event_name in sfx_map:
 		var player_node := AudioStreamPlayer.new()
-		var generator := AudioStreamGenerator.new()
-		generator.mix_rate = 44100.0
-		generator.buffer_length = 0.2
-		player_node.stream = generator
+		player_node.stream = sfx_map[event_name]
 		player_node.bus = "Master"
+		player_node.volume_db = linear_to_db(sfx_volume)
 		add_child(player_node)
-		audio_players.append(player_node)
+		sfx_players[event_name] = player_node
 
 
-func _setup_music() -> void:
-	music_player = AudioStreamPlayer.new()
-	var generator := AudioStreamGenerator.new()
-	generator.mix_rate = 44100.0
-	generator.buffer_length = 0.4
-	music_player.stream = generator
-	music_player.bus = "Master"
-	add_child(music_player)
+func _make_kenney_panel_style(texture: Texture2D, tint: Color = Color(1, 1, 1, 1), content_margin: float = 12.0) -> StyleBoxTexture:
+	var style := StyleBoxTexture.new()
+	style.texture = texture
+	style.texture_margin_left = 12
+	style.texture_margin_top = 12
+	style.texture_margin_right = 12
+	style.texture_margin_bottom = 12
+	style.axis_stretch_horizontal = StyleBoxTexture.AXIS_STRETCH_MODE_TILE
+	style.axis_stretch_vertical = StyleBoxTexture.AXIS_STRETCH_MODE_TILE
+	style.content_margin_left = content_margin
+	style.content_margin_top = content_margin
+	style.content_margin_right = content_margin
+	style.content_margin_bottom = content_margin
+	style.modulate_color = tint
+	return style
+
+
+func _style_button_kenney(button: Button) -> void:
+	if button == null:
+		return
+
+	var normal := _make_kenney_panel_style(UI_TUTORIAL_BTN_NORMAL_TEX, Color(0.34, 0.27, 0.18, 1.0), 10.0)
+	var hover := _make_kenney_panel_style(UI_TUTORIAL_BTN_HOVER_TEX, Color(0.44, 0.35, 0.23, 1.0), 10.0)
+	var pressed := _make_kenney_panel_style(UI_TUTORIAL_BTN_PRESSED_TEX, Color(0.25, 0.2, 0.14, 1.0), 10.0)
+	button.add_theme_stylebox_override("normal", normal)
+	button.add_theme_stylebox_override("hover", hover)
+	button.add_theme_stylebox_override("pressed", pressed)
+	button.add_theme_stylebox_override("focus", hover)
+	button.add_theme_color_override("font_color", Color(0.98, 0.95, 0.86, 1))
+	button.add_theme_color_override("font_focus_color", Color(1.0, 0.95, 0.75, 1))
+	button.add_theme_color_override("font_hover_color", Color(1.0, 0.95, 0.75, 1))
+	button.add_theme_color_override("font_pressed_color", Color(1.0, 0.9, 0.62, 1))
+
+
+func _apply_kenney_button_theme_to_tree(root: Node) -> void:
+	for child in root.get_children():
+		if child is Button:
+			var button := child as Button
+			if button != tutorial_button and button != tutorial_skip_button:
+				_style_button_kenney(button)
+		_apply_kenney_button_theme_to_tree(child)
+
+
+func _apply_kenney_ui_theme() -> void:
+	var solid_panel_style := _make_kenney_panel_style(UI_TUTORIAL_BTN_NORMAL_TEX, Color(0.14, 0.11, 0.08, 0.96), 14.0)
+	var transparent_panel_style := _make_kenney_panel_style(UI_TUTORIAL_PANEL_TEX, Color(0.82, 0.7, 0.44, 1.0), 14.0)
+
+	for panel in [shop_panel, boss_reward_panel, pause_panel, game_over_panel, main_menu_panel, boss_bar_panel, hud_panel]:
+		if panel != null:
+			panel.add_theme_stylebox_override("panel", solid_panel_style)
+	if options_panel != null:
+		options_panel.add_theme_stylebox_override("panel", solid_panel_style)
+	if tutorial_panel != null:
+		tutorial_panel.add_theme_stylebox_override("panel", transparent_panel_style)
+	if prompt_chip != null:
+		prompt_chip.add_theme_stylebox_override("panel", _make_kenney_panel_style(UI_TUTORIAL_PANEL_TEX, Color(0.18, 0.14, 0.1, 0.92), 10.0))
+	if message_chip != null:
+		message_chip.add_theme_stylebox_override("panel", _make_kenney_panel_style(UI_TUTORIAL_PANEL_TEX, Color(0.2, 0.15, 0.1, 0.95), 10.0))
+
+	if $UI != null:
+		_apply_kenney_button_theme_to_tree($UI)
+
+	_apply_hud_text_theme()
+
+
+func _apply_hud_text_theme() -> void:
+	for title_label in [hud_stats_title, hud_combat_title]:
+		title_label.add_theme_color_override("font_color", Color(1.0, 0.86, 0.52, 1))
+		title_label.add_theme_font_size_override("font_size", 18)
+
+	for stat_label in [hp_label, coins_label, score_label, wave_label, phase_label, trap_label]:
+		stat_label.add_theme_color_override("font_color", Color(0.98, 0.94, 0.86, 1))
+		stat_label.add_theme_font_size_override("font_size", 15)
+
+	prompt_label.add_theme_color_override("font_color", Color(0.98, 0.94, 0.86, 1))
+	prompt_label.add_theme_font_size_override("font_size", 20)
+	message_label.add_theme_color_override("font_color", Color(1.0, 0.9, 0.66, 1))
+	message_label.add_theme_font_size_override("font_size", 18)
+	boss_name_label.add_theme_color_override("font_color", Color(1.0, 0.88, 0.62, 1))
+	boss_name_label.add_theme_font_size_override("font_size", 16)
+	wave_banner.add_theme_color_override("font_color", Color(1.0, 0.9, 0.68, 1))
+	wave_banner.add_theme_color_override("font_shadow_color", Color(0.2, 0.12, 0.05, 0.55))
+	wave_banner.add_theme_constant_override("shadow_offset_x", 2)
+	wave_banner.add_theme_constant_override("shadow_offset_y", 2)
+
+
+func _build_tutorial_ui() -> void:
+	tutorial_panel = Panel.new()
+	tutorial_panel.visible = false
+	tutorial_panel.process_mode = Node.PROCESS_MODE_ALWAYS
+	tutorial_panel.modulate = Color(1, 1, 1, 0.98)
+
+	var panel_style := _make_kenney_panel_style(UI_TUTORIAL_PANEL_TEX, Color(0.82, 0.7, 0.44, 1.0), 14.0)
+	tutorial_panel.add_theme_stylebox_override("panel", panel_style)
+	$UI.add_child(tutorial_panel)
+
+	var vbox := VBoxContainer.new()
+	vbox.set_anchors_preset(Control.PRESET_FULL_RECT)
+	vbox.offset_left = 18.0
+	vbox.offset_top = 16.0
+	vbox.offset_right = -18.0
+	vbox.offset_bottom = -16.0
+	vbox.add_theme_constant_override("separation", 8)
+	tutorial_panel.add_child(vbox)
+
+	tutorial_title_label = Label.new()
+	tutorial_title_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	tutorial_title_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	tutorial_title_label.add_theme_font_size_override("font_size", 24)
+	tutorial_title_label.add_theme_color_override("font_color", Color(1, 0.88, 0.58, 1))
+	tutorial_title_label.custom_minimum_size = Vector2(0, 34)
+	vbox.add_child(tutorial_title_label)
+
+	tutorial_body_label = RichTextLabel.new()
+	tutorial_body_label.bbcode_enabled = false
+	tutorial_body_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	tutorial_body_label.scroll_active = true
+	tutorial_body_label.fit_content = false
+	tutorial_body_label.selection_enabled = false
+	tutorial_body_label.add_theme_font_size_override("normal_font_size", 16)
+	tutorial_body_label.add_theme_color_override("default_color", Color(0.96, 0.94, 0.88, 1))
+	tutorial_body_label.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	tutorial_body_label.custom_minimum_size = Vector2(0, 180)
+	vbox.add_child(tutorial_body_label)
+
+	var button_row := HBoxContainer.new()
+	button_row.add_theme_constant_override("separation", 10)
+	button_row.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	vbox.add_child(button_row)
+
+	tutorial_skip_button = Button.new()
+	tutorial_skip_button.custom_minimum_size = Vector2(150, 44)
+	tutorial_skip_button.text = "Skip Tutorial"
+	tutorial_skip_button.focus_mode = Control.FOCUS_ALL
+	tutorial_skip_button.pressed.connect(_skip_tutorial)
+	button_row.add_child(tutorial_skip_button)
+
+	tutorial_button = Button.new()
+	tutorial_button.custom_minimum_size = Vector2(190, 44)
+	tutorial_button.text = "Got it"
+	tutorial_button.focus_mode = Control.FOCUS_ALL
+	tutorial_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	tutorial_button.pressed.connect(_on_tutorial_button_pressed)
+	button_row.add_child(tutorial_button)
+
+	_style_button_kenney(tutorial_button)
+	_style_button_kenney(tutorial_skip_button)
+
+
+func _on_tutorial_button_pressed() -> void:
+	_advance_tutorial()
+
+
+func _skip_tutorial() -> void:
+	_hide_tutorial()
+
+
+func _show_tutorial(title: String, body: String, button_text: String = "Got it") -> void:
+	if tutorial_panel == null:
+		return
+	tutorial_pages.clear()
+	tutorial_page_index = -1
+	tutorial_title_label.text = title
+	tutorial_body_label.text = body
+	tutorial_body_label.scroll_to_line(0)
+	tutorial_button.text = button_text
+	if tutorial_skip_button != null:
+		tutorial_skip_button.visible = false
+	tutorial_panel.visible = true
+	tutorial_button.grab_focus()
+
+
+func _show_tutorial_page(page_index: int) -> void:
+	if tutorial_panel == null:
+		return
+	if page_index < 0 or page_index >= tutorial_pages.size():
+		_hide_tutorial()
+		return
+	tutorial_page_index = page_index
+	var page: Dictionary = tutorial_pages[page_index]
+	tutorial_title_label.text = str(page.get("title", "How to Play"))
+	tutorial_body_label.text = str(page.get("body", ""))
+	tutorial_body_label.scroll_to_line(0)
+	tutorial_button.text = "Start Defending" if page_index == tutorial_pages.size() - 1 else "Next"
+	if tutorial_skip_button != null:
+		tutorial_skip_button.visible = page_index < tutorial_pages.size() - 1
+	tutorial_panel.visible = true
+	tutorial_button.grab_focus()
+
+
+func _advance_tutorial() -> void:
+	if tutorial_pages.is_empty():
+		_hide_tutorial()
+		return
+	var next_index := tutorial_page_index + 1
+	if next_index >= tutorial_pages.size():
+		_hide_tutorial()
+		return
+	_show_tutorial_page(next_index)
+
+
+func _hide_tutorial() -> void:
+	tutorial_pages.clear()
+	tutorial_page_index = -1
+	if tutorial_panel != null:
+		tutorial_panel.visible = false
+
+
+func _show_intro_tutorial() -> void:
+	if not tutorial_enabled:
+		return
+	tutorial_pages = [
+		{
+			"title": "Movement",
+			"body": "Move with [WASD] or Arrow Keys.\n\nPress [Enter] for next tip, or use [Skip Tutorial].\n\nIn prep phase, explore the yard and collect your bearings before climbing."
+		},
+		{
+			"title": "Shop (Prep Only)",
+			"body": "Walk to the shop area and press [E] to open the shop.\n\nSpend coins on wall repairs, upgrades, traps, and defenses before each wave."
+		},
+		{
+			"title": "Ladder",
+			"body": "At the ladder bottom, press [W] to climb to the wall.\n\nDuring prep only, press [S] at the top to climb back down."
+		},
+		{
+			"title": "Combat",
+			"body": "On the wall: aim with mouse and shoot with Click or [Space].\n\nPrioritize ranged enemies and runners. Keep your wall healthy."
+		}
+	]
+	_show_tutorial_page(0)
 
 
 func _build_options_ui() -> void:
@@ -1956,6 +2736,17 @@ func _apply_settings() -> void:
 	get_window().content_scale_factor = resolution_scale
 	var master_bus := AudioServer.get_bus_index("Master")
 	AudioServer.set_bus_volume_db(master_bus, linear_to_db(max(master_volume, 0.0001)))
+
+	# Update music volume
+	if music_player != null:
+		music_player.volume_db = linear_to_db(max(music_volume, 0.0001))
+
+	# Update SFX volumes
+	for key in sfx_players:
+		var sfx_node: AudioStreamPlayer = sfx_players[key]
+		if sfx_node != null:
+			sfx_node.volume_db = linear_to_db(max(sfx_volume, 0.0001))
+
 	if options_panel != null:
 		options_panel.apply_settings(_get_settings_dictionary())
 
@@ -1970,118 +2761,32 @@ func _on_options_settings_changed(settings: Dictionary) -> void:
 	_save_settings()
 
 
-func _play_sound(event_name: String, data: Dictionary = {}) -> void:
-	if audio_players.is_empty():
-		return
-
+func _play_sound(event_name: String, _data: Dictionary = {}) -> void:
+	# Map aliases to loaded SFX players
+	var key := event_name
 	match event_name:
-		"shoot":
-			_play_tone(0, 760.0 + damage_level * 40.0, 0.045, 0.16, "triangle", 1.0)
-			_play_tone(1, 980.0, 0.03, 0.08, "sine", 0.25)
-		"turret_shoot":
-			_play_tone(0, 610.0 + turret_level * 30.0, 0.05, 0.14, "square", 0.4)
-			_play_tone(1, 820.0, 0.035, 0.06, "triangle", 0.15)
-		"enemy_hit":
-			var hit_pitch: float = 320.0
-			var target_type := str(data.get("target_type", "grunt"))
-			if target_type == "armored":
-				hit_pitch = 240.0
-			elif target_type == "runner":
-				hit_pitch = 390.0
-			_play_tone(2, hit_pitch, 0.035, 0.1, "square", 0.15)
-		"enemy_die":
-			_play_tone(2, 180.0, 0.08, 0.15, "saw", -0.45)
-		"wall_hit":
-			_play_tone(3, 110.0, 0.16, 0.22, "noise", -0.4)
-			_play_tone(4, 84.0, 0.18, 0.12, "sine", -0.35)
-		"trap_spike":
-			_play_tone(3, 520.0, 0.05, 0.16, "square", 0.2)
-			_play_tone(4, 280.0, 0.08, 0.11, "noise", -0.1)
-		"trap_fire":
-			_play_tone(3, 420.0, 0.12, 0.18, "noise", 0.25)
-			_play_tone(4, 620.0, 0.08, 0.1, "sine", 0.15)
+		"enemy_hit", "wall_hit":
+			key = "shoot"  # reuse arrow impact sound for hits
 		"trap_slow":
-			_play_tone(3, 360.0, 0.12, 0.16, "triangle", -0.05)
-			_play_tone(4, 520.0, 0.14, 0.08, "sine", -0.1)
-		"buy":
-			_play_tone(5, 540.0, 0.05, 0.09, "sine", 0.1)
-			_play_tone(5, 720.0, 0.06, 0.08, "sine", 0.1)
+			key = "trap_spike"  # reuse bear trap sound
+		"buy", "shop_open", "shop_close":
+			key = "shoot"  # short click-like reuse
 		"deny":
-			_play_tone(5, 220.0, 0.06, 0.09, "square", -0.2)
-		"shop_open":
-			_play_tone(5, 440.0, 0.05, 0.07, "sine", 0.0)
-		"shop_close":
-			_play_tone(5, 340.0, 0.05, 0.05, "sine", 0.0)
-		"wave_start":
-			_play_tone(0, 330.0, 0.08, 0.12, "saw", 0.0)
-			_play_tone(1, 494.0, 0.09, 0.11, "saw", 0.0)
-		"wave_clear":
-			_play_tone(0, 520.0, 0.08, 0.1, "sine", 0.0)
-			_play_tone(1, 659.0, 0.1, 0.09, "sine", 0.0)
+			key = "trap_spike"
+		"wave_start", "wave_clear":
+			key = "shoot"
+
+	if sfx_players.has(key):
+		var player_node: AudioStreamPlayer = sfx_players[key]
+		player_node.volume_db = linear_to_db(max(sfx_volume, 0.0001))
+		player_node.pitch_scale = randf_range(0.9, 1.1)
+		player_node.play()
 
 
-func _update_music(delta: float) -> void:
+func _update_music(_delta: float) -> void:
 	if music_player == null:
 		return
-
-	music_step_time -= delta
-	if music_step_time > 0.0:
-		return
-
-	music_step_time = 0.42
-	var melody_freq: float = music_melody[music_step_index % music_melody.size()]
-	var bass_freq: float = music_bass[music_step_index % music_bass.size()]
-	if music_volume > 0.0:
-		_play_generated_tone(music_player, melody_freq, 0.34, 0.05, "sine", 0.0, music_volume)
-		if bass_freq > 0.0:
-			_play_generated_tone(music_player, bass_freq, 0.36, 0.035, "triangle", 0.0, music_volume)
-	music_step_index += 1
-
-
-func _play_tone(player_index: int, frequency: float, duration: float, volume: float, waveform: String = "sine", pitch_slide: float = 0.0) -> void:
-	if player_index < 0 or player_index >= audio_players.size():
-		return
-	_play_generated_tone(audio_players[player_index], frequency, duration, volume, waveform, pitch_slide, sfx_volume)
-
-
-func _play_generated_tone(player_node: AudioStreamPlayer, frequency: float, duration: float, volume: float, waveform: String, pitch_slide: float, gain: float) -> void:
-	if player_node == null or frequency <= 0.0 or gain <= 0.0:
-		return
-	if not player_node.playing:
-		player_node.play()
-
-	var playback := player_node.get_stream_playback() as AudioStreamGeneratorPlayback
-	if playback == null:
-		player_node.play()
-		playback = player_node.get_stream_playback() as AudioStreamGeneratorPlayback
-	if playback == null:
-		return
-
-	var mix_rate: float = 44100.0
-	var frame_count: int = int(duration * mix_rate)
-	var phase: float = 0.0
-	for i in range(frame_count):
-		var t: float = float(i) / max(float(frame_count), 1.0)
-		var current_freq: float = max(40.0, frequency * (1.0 + pitch_slide * t))
-		phase += TAU * current_freq / mix_rate
-		var sample := _sample_waveform(waveform, phase)
-		var envelope := 1.0 - t
-		playback.push_frame(Vector2.ONE * sample * volume * gain * envelope)
-	player_node.play()
-
-
-func _sample_waveform(waveform: String, phase: float) -> float:
-	match waveform:
-		"square":
-			return 1.0 if sin(phase) >= 0.0 else -1.0
-		"triangle":
-			return asin(sin(phase)) * (2.0 / PI)
-		"saw":
-			return fmod(phase / PI, 2.0) - 1.0
-		"noise":
-			return randf_range(-1.0, 1.0)
-		_:
-			return sin(phase)
+	music_player.volume_db = linear_to_db(max(music_volume * master_volume, 0.0001))
 
 
 func _update_shop_tab_visibility() -> void:
@@ -2134,7 +2839,7 @@ func _set_shop_info(title: String, body: String) -> void:
 
 
 func _show_repair_info() -> void:
-	_set_shop_info("Repair Wall", "Current wall HP: %d/%d\nRepairs +1 HP instantly during prep." % [castle_hp, max_castle_hp])
+	_set_shop_info("Repair Wall", "Current wall HP: %d/%d\nRepairs +2 HP instantly during prep." % [castle_hp, max_castle_hp])
 
 
 func _show_fire_rate_info() -> void:
@@ -2146,7 +2851,9 @@ func _show_damage_info() -> void:
 
 
 func _show_wall_upgrade_info() -> void:
-	_set_shop_info("Wall Level %d → %d" % [wall_level, wall_level + 1], "Adds +3 max HP\nExpands active trap coverage to %d points." % [min(battlefield_trap_points.size(), 4 + max(wall_level, 0) + max(keep_level - 1, 0))])
+	var next_guard_count: int = min(2 + max(wall_level, 0), guard_home_positions.size())
+	var next_trap_points: int = min(battlefield_trap_points.size(), 4 + max(wall_level, 0) + max(keep_level - 1, 0))
+	_set_shop_info("Wall Level %d → %d" % [wall_level, wall_level + 1], "Adds +4 max HP\nRaises knight defenders to %d\nExpands active trap coverage to %d points." % [next_guard_count, next_trap_points])
 
 
 func _show_keep_upgrade_info() -> void:
@@ -2200,7 +2907,7 @@ func _update_shop_tab_info() -> void:
 		SHOP_TAB_TRAPS:
 			_set_shop_info("Traps", "Active trap points: %d/%d\nBought traps auto-deploy to a random open battlefield point." % [_get_active_trap_point_count(), battlefield_trap_points.size()])
 		_:
-			_set_shop_info("Fortress Upgrades", "Wall Lv.%d | Keep Lv.%d\nGrow the castle, unlock defenses, and expand battlefield control." % [wall_level, keep_level])
+			_set_shop_info("Fortress Upgrades", "Wall Lv.%d | Keep Lv.%d | Knights %d\nGrow the castle, unlock defenses, and send more defenders out through the gate." % [wall_level, keep_level, _get_active_knight_guard_count()])
 
 
 func _refresh_shop_buttons() -> void:
@@ -2242,16 +2949,20 @@ func _update_prompt() -> void:
 	var prompt := ""
 	if current_phase == PHASE_PREP and player_is_on_lower_lane:
 		if player_in_shop_zone:
-			prompt = "Press E to open shop"
+			prompt = "Press E to open shop and spend coins"
+		elif player_near_ladder_bottom or _is_player_near_ladder_bottom():
+			prompt = "Press W to climb to the wall when ready"
+		elif tutorial_enabled and not battle_started:
+			prompt = "Move with WASD or arrows. Explore the yard before starting."
 		elif _has_armed_traps():
 			prompt = "Armed trap markers show active battlefield coverage"
-		elif player_near_ladder_bottom or _is_player_near_ladder_bottom():
-			prompt = "Press W to climb to the wall"
 	elif current_phase == PHASE_PREP and not player_is_on_lower_lane:
 		if player_near_ladder_top or _is_player_near_ladder_top():
 			prompt = "Press S to return to the yard"
 	elif current_phase == PHASE_BATTLE and player_is_on_lower_lane:
-		prompt = "Battle active - climbing to the wall"
+		prompt = "Battle active - climb back to the wall"
+	elif current_phase == PHASE_BATTLE and tutorial_enabled and wave_index == 1:
+		prompt = "Aim with the mouse and click or press Space to shoot"
 
 	prompt_label.text = prompt
 
@@ -2331,14 +3042,14 @@ func _claim_boss_reward(reward_type: String) -> void:
 
 
 func _update_hud() -> void:
-	hp_label.text = "Wall L%d  HP: %d/%d" % [wall_level, castle_hp, max_castle_hp]
+	hp_label.text = "Wall L%d  HP:%d/%d" % [wall_level, castle_hp, max_castle_hp]
 	coins_label.text = "Coins: %d" % coins
-	score_label.text = "Keep L%d  Score: %d" % [keep_level, score]
+	score_label.text = "Keep L%d  Score:%d" % [keep_level, score]
 	if wave_index > 0:
 		wave_label.text = "Wave: %d" % wave_index
 	else:
 		wave_label.text = "Wave: -"
-	trap_label.text = "Armed S:%d F:%d L:%d  T:%d C:%d" % [int(trap_inventory[TRAP_SPIKE]), int(trap_inventory[TRAP_FIRE]), int(trap_inventory[TRAP_SLOW]), _get_active_turret_count(), catapult_level]
+	trap_label.text = "S:%d F:%d L:%d T:%d K:%d" % [int(trap_inventory[TRAP_SPIKE]), int(trap_inventory[TRAP_FIRE]), int(trap_inventory[TRAP_SLOW]), _get_active_turret_count(), _get_active_knight_guard_count()]
 
 	var hp_ratio: float = clamp(float(castle_hp) / max(float(max_castle_hp), 1.0), 0.0, 1.0)
 	hp_bar_fill.scale.x = hp_ratio

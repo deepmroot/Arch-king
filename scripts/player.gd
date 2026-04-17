@@ -1,10 +1,30 @@
 extends CharacterBody2D
 
 signal shoot_requested(spawn_position: Vector2, target_position: Vector2)
+signal melee_impact(position: Vector2, radius: float)
 
-const IDLE_RUN_SHEET := preload("res://assets/player/idle_run.png")
-const ATTACK_SHEET := preload("res://assets/player/attack.png")
-const DEATH_SHEET := preload("res://assets/player/death.png")
+const ARCHER_IDLE_RUN := preload("res://assets/player/archer/idle_run.png")
+const ARCHER_ATTACK    := preload("res://assets/player/archer/attack.png")
+const ARCHER_DEATH     := preload("res://assets/player/archer/death.png")
+
+const HUNTRESS_IDLE    := preload("res://assets/player/huntress/Idle.png")
+const HUNTRESS_RUN     := preload("res://assets/player/huntress/Run.png")
+const HUNTRESS_ATTACK  := preload("res://assets/player/huntress/Attack1.png")
+const HUNTRESS_DEATH   := preload("res://assets/player/huntress/Death.png")
+
+const HERO_KNIGHT_IDLE   := preload("res://assets/player/hero_knight/idle.png")
+const HERO_KNIGHT_RUN    := preload("res://assets/player/hero_knight/run.png")
+const HERO_KNIGHT_ATTACK := preload("res://assets/player/hero_knight/attack.png")
+const HERO_KNIGHT_DEATH  := preload("res://assets/player/hero_knight/death.png")
+
+const WIZARD_IDLE      := preload("res://assets/player/wizard/idle.png")
+const WIZARD_ATTACK    := preload("res://assets/player/wizard/attack.png")
+const WIZARD_DEATH     := preload("res://assets/player/wizard/death.png")
+const WIZARD_FLY       := preload("res://assets/player/wizard/fly_forward.png")
+
+const SORCERER_IDLE    := preload("res://assets/player/wizard/sorcerer_idle.png")
+const SORCERER_ATTACK  := preload("res://assets/player/wizard/sorcerer_attack.png")
+const SORCERER_DEATH   := preload("res://assets/player/wizard/death.png")
 
 @export var speed := 350.0
 @export var wall_y := 90.0
@@ -21,6 +41,10 @@ var movement_locked := false
 var free_move_mode := false
 var lower_bound_y := 0.0
 var upper_bound_y := 0.0
+var queued_shot_pending := false
+var melee_damage := 2
+var melee_attack_radius := 60.0
+var melee_attack_offset := 34.0
 
 @onready var shoot_point: Marker2D = $ShootPoint
 @onready var animated_sprite: AnimatedSprite2D = $AnimatedSprite2D
@@ -66,7 +90,10 @@ func _physics_process(delta: float) -> void:
 	else:
 		global_position.y = current_lane_y
 
-	if _is_shoot_just_pressed():
+	if GameState.is_melee_character():
+		if fire_timer <= 0.0 and not is_attacking:
+			_try_auto_melee()
+	elif _is_shoot_just_pressed():
 		shoot()
 
 	if not is_attacking:
@@ -80,7 +107,12 @@ func shoot() -> void:
 	fire_timer = fire_cooldown
 	is_attacking = true
 	animated_sprite.play("attack")
-	shoot_requested.emit(shoot_point.global_position, get_global_mouse_position())
+	var target_position: Vector2 = get_global_mouse_position()
+	if GameState.selected_character == GameState.CHAR_RANGER:
+		queued_shot_pending = true
+		_emit_delayed_shot(target_position, 0.22)
+		return
+	shoot_requested.emit(shoot_point.global_position, target_position)
 
 
 func die() -> void:
@@ -88,6 +120,7 @@ func die() -> void:
 		return
 
 	is_dead = true
+	queued_shot_pending = false
 	velocity = Vector2.ZERO
 	collision_shape.disabled = true
 	is_attacking = false
@@ -117,6 +150,51 @@ func set_movement_locked(locked: bool) -> void:
 	movement_locked = locked
 	if locked:
 		velocity = Vector2.ZERO
+
+
+func _emit_delayed_shot(target_position: Vector2, delay: float) -> void:
+	await get_tree().create_timer(delay).timeout
+	if is_dead or queued_shot_pending == false:
+		return
+	queued_shot_pending = false
+	shoot_requested.emit(shoot_point.global_position, target_position)
+
+
+func _emit_delayed_melee_hit(delay: float) -> void:
+	await get_tree().create_timer(delay).timeout
+	if is_dead or queued_shot_pending == false:
+		return
+	queued_shot_pending = false
+	_perform_melee_attack()
+
+
+func _try_auto_melee() -> void:
+	for enemy_node in get_tree().get_nodes_in_group("enemies"):
+		var enemy := enemy_node as Area2D
+		if enemy == null or not is_instance_valid(enemy):
+			continue
+		if global_position.distance_to(enemy.global_position) <= melee_attack_radius:
+			fire_timer = fire_cooldown
+			is_attacking = true
+			animated_sprite.play("attack")
+			queued_shot_pending = true
+			_emit_delayed_melee_hit(0.16)
+			return
+
+
+func _perform_melee_attack() -> void:
+	var hit_any := false
+	for enemy_node in get_tree().get_nodes_in_group("enemies"):
+		var enemy := enemy_node as Area2D
+		if enemy == null or not is_instance_valid(enemy):
+			continue
+		if global_position.distance_to(enemy.global_position) > melee_attack_radius:
+			continue
+		if enemy.has_method("take_damage"):
+			enemy.take_damage(melee_damage)
+			hit_any = true
+	if hit_any:
+		melee_impact.emit(global_position, melee_attack_radius)
 
 
 func _on_animation_finished() -> void:
@@ -149,10 +227,36 @@ func _update_facing(direction: float) -> void:
 func _build_animations() -> void:
 	var frames := SpriteFrames.new()
 
-	_add_grid_animation(frames, "idle", IDLE_RUN_SHEET, 8, 2, 0, 0, 1, 3.0, true)
-	_add_grid_animation(frames, "run", IDLE_RUN_SHEET, 8, 2, 1, 0, 7, 10.0, true)
-	_add_grid_animation(frames, "attack", ATTACK_SHEET, 8, 4, 0, 0, 7, 14.0, false)
-	_add_grid_animation(frames, "death", DEATH_SHEET, 8, 3, 1, 0, 7, 9.0, false)
+	if GameState.selected_character == GameState.CHAR_WIZARD:
+		_add_grid_animation(frames, "idle",   WIZARD_IDLE,   10, 1, 0, 0, 9,  6.0, true)
+		_add_grid_animation(frames, "run",    WIZARD_FLY,     6, 1, 0, 0, 5,  8.0, true)
+		_add_grid_animation(frames, "attack", WIZARD_ATTACK,  8, 1, 0, 0, 7, 14.0, false)
+		_add_grid_animation(frames, "death",  WIZARD_DEATH,  10, 1, 0, 0, 9,  8.0, false)
+	elif GameState.selected_character == GameState.CHAR_RANGER:
+		_add_strip_animation(frames, "idle", HUNTRESS_IDLE, 8, 6.0, true)
+		_add_strip_animation(frames, "run", HUNTRESS_RUN, 8, 10.0, true)
+		_add_strip_animation(frames, "attack", HUNTRESS_ATTACK, 5, 12.0, false)
+		_add_strip_animation(frames, "death", HUNTRESS_DEATH, 8, 8.0, false)
+	elif GameState.selected_character == GameState.CHAR_WARDEN:
+		_add_strip_animation(frames, "idle", HERO_KNIGHT_IDLE, 8, 6.0, true)
+		_add_strip_animation(frames, "run", HERO_KNIGHT_RUN, 10, 10.0, true)
+		_add_strip_animation(frames, "attack", HERO_KNIGHT_ATTACK, 6, 12.0, false)
+		_add_strip_animation(frames, "death", HERO_KNIGHT_DEATH, 10, 8.0, false)
+	elif GameState.selected_character == GameState.CHAR_MERCHANT:
+		# idle: first 3 frames (standing with staff)
+		_add_grid_animation(frames, "idle",   SORCERER_IDLE, 10, 1, 0, 0, 2,  4.0, true)
+		_add_grid_animation(frames, "run",    SORCERER_IDLE, 10, 1, 0, 0, 2,  6.0, true)
+		# attack: frames 3-9 (staff charges and releases shockwave)
+		_add_grid_animation(frames, "attack", SORCERER_IDLE, 10, 1, 0, 3, 9, 12.0, false)
+		_add_strip_animation(frames, "death",  SORCERER_DEATH, 10,  8.0, false)
+		animated_sprite.scale = Vector2(0.52, 0.52)
+		fire_cooldown = 1.2
+		melee_attack_radius = 110.0
+	else:
+		_add_grid_animation(frames, "idle",   ARCHER_IDLE_RUN, 8, 2, 0, 0, 1,  3.0, true)
+		_add_grid_animation(frames, "run",    ARCHER_IDLE_RUN, 8, 2, 1, 0, 7, 10.0, true)
+		_add_grid_animation(frames, "attack", ARCHER_ATTACK,   8, 4, 0, 0, 7, 14.0, false)
+		_add_grid_animation(frames, "death",  ARCHER_DEATH,    8, 3, 1, 0, 7,  9.0, false)
 
 	animated_sprite.sprite_frames = frames
 
@@ -226,4 +330,26 @@ func _add_grid_animation(
 		var atlas := AtlasTexture.new()
 		atlas.atlas = texture
 		atlas.region = Rect2(col * frame_width, row_index * frame_height, frame_width, frame_height)
+		frames.add_frame(animation_name, atlas)
+
+
+func _add_strip_animation(
+	frames: SpriteFrames,
+	animation_name: String,
+	texture: Texture2D,
+	frame_count: int,
+	fps: float,
+	loop: bool
+) -> void:
+	frames.add_animation(animation_name)
+	frames.set_animation_speed(animation_name, fps)
+	frames.set_animation_loop(animation_name, loop)
+
+	var frame_width := int(texture.get_width() / float(frame_count))
+	var frame_height := texture.get_height()
+
+	for i in range(frame_count):
+		var atlas := AtlasTexture.new()
+		atlas.atlas = texture
+		atlas.region = Rect2(i * frame_width, 0, frame_width, frame_height)
 		frames.add_frame(animation_name, atlas)

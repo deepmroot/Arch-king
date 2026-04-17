@@ -7,6 +7,21 @@ signal enemy_hit(damage_dealt: int, killed: bool, target_type: String, world_pos
 
 const GOBLIN_SHEET := preload("res://assets/enemies/goblin.png")
 
+# Per-type goblin variant sprites (4-dir x 3-frame grid each)
+const GOBLIN_GRUNT := preload("res://assets/enemies/goblins/$Goblin_1.png")
+const GOBLIN_ARMORED := preload("res://assets/enemies/goblins/$Goblin_2.png")
+const GOBLIN_RUNNER := preload("res://assets/enemies/goblins/$Goblin_3.png")
+const GOBLIN_RANGED := preload("res://assets/enemies/goblins/$Goblin_4.png")
+const GOBLIN_SHIELD := preload("res://assets/enemies/goblins/$Goblin_5.png")
+const GOBLIN_SHADOW := preload("res://assets/enemies/goblins/Shadow.png")
+const GOBLIN_KING_SHEET := preload("res://assets/enemies/goblin_king/goblin_king_sheet.png")
+const GOBLIN_MECH_SHEET := preload("res://assets/enemies/goblin_mech/goblin_mech_sheet.png")
+const FROST_GOBLIN_0 := preload("res://assets/enemies/frost_goblins/Frost_Goblin_0.png")
+const LARGE_FROST_GOBLIN_0 := preload("res://assets/enemies/frost_goblins/Large_Frost_Goblin_0.png")
+const MECHA_GOLEM_SHEET := preload("res://assets/enemies/mecha_golem/character_sheet.png")
+const MECHA_GOLEM_LASER_SHEET := preload("res://assets/enemies/mecha_golem/laser_sheet.png")
+const MECHA_GOLEM_PROJECTILE_GLOW := preload("res://assets/enemies/mecha_golem/arm_projectile_glowing.png")
+
 @export var speed := 85.0
 @export var max_health := 1
 @export var coin_reward := 1
@@ -33,6 +48,9 @@ var burst_time_remaining := 0.0
 var burst_cooldown_remaining := 0.0
 var target_position := Vector2.ZERO
 var stop_distance := 12.0
+var mecha_charge_duration := 0.6
+var mecha_warning_active := false
+var mecha_warning_fx: Node2D
 
 @onready var animated_sprite: AnimatedSprite2D = $AnimatedSprite2D
 @onready var collision_shape: CollisionShape2D = $CollisionShape2D
@@ -47,10 +65,11 @@ var elite_marker: Polygon2D
 func _ready() -> void:
 	add_to_group("enemies")
 	current_health = max_health
-	_build_animations()
 	_build_status_visuals()
-	animated_sprite.play("walk")
 	animated_sprite.animation_finished.connect(_on_animation_finished)
+	# Build default animations (grunt) in case configure() is not called
+	_build_animations()
+	animated_sprite.play("walk")
 	_update_health_bar()
 
 
@@ -66,6 +85,9 @@ func configure(definition: Dictionary) -> void:
 	attack_interval = float(definition.get("attack_interval", attack_interval))
 	attack_line_y = float(definition.get("attack_line_y", wall_y - 120.0))
 	attack_timer = attack_interval
+	mecha_charge_duration = float(definition.get("mecha_charge_duration", mecha_charge_duration))
+	mecha_warning_active = false
+	_clear_mecha_charge_warning()
 	shield_points = int(definition.get("shield_points", 0))
 	burst_speed_multiplier = float(definition.get("burst_speed_multiplier", 1.0))
 	burst_duration = float(definition.get("burst_duration", 0.0))
@@ -75,13 +97,16 @@ func configure(definition: Dictionary) -> void:
 	var visual_scale := float(definition.get("scale", 1.0))
 	var tint: Color = definition.get("tint", Color(1, 1, 1, 1))
 	base_tint = tint
-	animated_sprite.scale = Vector2.ONE * 0.1 * visual_scale
 	animated_sprite.modulate = base_tint
 	shadow.scale = Vector2.ONE * visual_scale
 	current_health = max_health
 	if is_elite and elite_marker != null:
 		elite_marker.visible = true
 		elite_marker.scale = Vector2.ONE * clamp(visual_scale, 1.0, 1.6)
+	# Build animations now that enemy_type is set, then apply scale
+	_build_animations()
+	animated_sprite.scale = animated_sprite.scale * visual_scale
+	animated_sprite.play("walk")
 	_update_health_bar()
 
 
@@ -110,10 +135,20 @@ func _process(delta: float) -> void:
 	if attack_mode == "ranged" and global_position.y >= attack_line_y:
 		global_position.y = attack_line_y
 		attack_timer -= delta
-		animated_sprite.speed_scale = 0.75
-		if attack_timer <= 0.0:
-			attack_timer = attack_interval
-			_perform_ranged_attack()
+		animated_sprite.speed_scale = 0.55 if enemy_type == "mecha_boss" and mecha_warning_active else 0.75
+		if enemy_type == "mecha_boss":
+			if not mecha_warning_active and attack_timer <= mecha_charge_duration:
+				mecha_warning_active = true
+				_spawn_mecha_charge_warning()
+			if attack_timer <= 0.0:
+				attack_timer = attack_interval
+				mecha_warning_active = false
+				_clear_mecha_charge_warning()
+				_perform_ranged_attack()
+		else:
+			if attack_timer <= 0.0:
+				attack_timer = attack_interval
+				_perform_ranged_attack()
 		return
 
 	animated_sprite.speed_scale = 1.22 if burst_time_remaining > 0.0 else 1.0
@@ -121,6 +156,7 @@ func _process(delta: float) -> void:
 
 	if global_position.y >= wall_y:
 		is_dead = true
+		_clear_mecha_charge_warning()
 		reached_wall.emit(castle_damage)
 		queue_free()
 
@@ -146,6 +182,7 @@ func take_damage(amount: int = 1) -> void:
 		return
 
 	is_dead = true
+	_clear_mecha_charge_warning()
 	collision_shape.disabled = true
 	enemy_killed.emit(coin_reward)
 	animated_sprite.play("death")
@@ -172,12 +209,95 @@ func _perform_ranged_attack() -> void:
 	wall_attacked.emit(castle_damage)
 	var base_color := animated_sprite.modulate
 	animated_sprite.modulate = Color(min(base_color.r + 0.25, 1.4), min(base_color.g + 0.18, 1.35), min(base_color.b + 0.1, 1.2), base_color.a)
+	if enemy_type == "mecha_boss":
+		_spawn_mecha_laser_fx()
 	var tween := animated_sprite.create_tween()
 	tween.tween_property(animated_sprite, "modulate", base_color, 0.16)
 
 
+func _spawn_mecha_charge_warning() -> void:
+	_clear_mecha_charge_warning()
+	mecha_warning_fx = Node2D.new()
+	mecha_warning_fx.global_position = global_position + Vector2(0, -12)
+	get_tree().current_scene.add_child(mecha_warning_fx)
+
+	var orb := Sprite2D.new()
+	orb.texture = MECHA_GOLEM_PROJECTILE_GLOW
+	orb.hframes = 3
+	orb.vframes = 2
+	orb.frame = 3 + int(randi() % 3)
+	orb.scale = Vector2.ONE * 0.42
+	orb.modulate = Color(0.95, 0.5, 0.28, 0.9)
+	mecha_warning_fx.add_child(orb)
+
+	var warning_line := Line2D.new()
+	warning_line.width = 3.0
+	warning_line.default_color = Color(1.0, 0.42, 0.2, 0.32)
+	warning_line.position = Vector2.ZERO
+	warning_line.points = PackedVector2Array([
+		Vector2.ZERO,
+		Vector2(0, wall_y - global_position.y + 4.0)
+	])
+	mecha_warning_fx.add_child(warning_line)
+
+	var tween: Tween = mecha_warning_fx.create_tween()
+	tween.set_loops(4)
+	tween.parallel().tween_property(orb, "scale", Vector2.ONE * 0.62, 0.12)
+	tween.parallel().tween_property(orb, "modulate", Color(1.0, 0.86, 0.45, 1.0), 0.12)
+	tween.parallel().tween_property(warning_line, "default_color", Color(1.0, 0.72, 0.36, 0.58), 0.12)
+	tween.tween_interval(0.04)
+	tween.parallel().tween_property(orb, "scale", Vector2.ONE * 0.42, 0.12)
+	tween.parallel().tween_property(orb, "modulate", Color(0.95, 0.5, 0.28, 0.9), 0.12)
+	tween.parallel().tween_property(warning_line, "default_color", Color(1.0, 0.42, 0.2, 0.32), 0.12)
+
+
+func _clear_mecha_charge_warning() -> void:
+	if mecha_warning_fx != null and is_instance_valid(mecha_warning_fx):
+		mecha_warning_fx.queue_free()
+	mecha_warning_fx = null
+
+
+func _spawn_mecha_laser_fx() -> void:
+	var fx_root := Node2D.new()
+	fx_root.global_position = global_position + Vector2(0, -12)
+	get_tree().current_scene.add_child(fx_root)
+
+	var orb := Sprite2D.new()
+	orb.texture = MECHA_GOLEM_PROJECTILE_GLOW
+	orb.hframes = 3
+	orb.vframes = 2
+	orb.frame = randi() % 6
+	orb.scale = Vector2.ONE * 0.55
+	orb.modulate = Color(0.85, 1.0, 1.15, 0.95)
+	fx_root.add_child(orb)
+
+	var beam_distance: float = max(wall_y - global_position.y, 140.0)
+	var orb_tween: Tween = orb.create_tween()
+	orb_tween.parallel().tween_property(orb, "position", Vector2(0, beam_distance * 0.82), 0.12)
+	orb_tween.parallel().tween_property(orb, "scale", Vector2.ONE * 0.78, 0.12)
+
+	var beam := Sprite2D.new()
+	beam.texture = MECHA_GOLEM_LASER_SHEET
+	beam.hframes = 1
+	beam.vframes = 15
+	beam.frame = 8 + int(randi() % 6)
+	beam.centered = true
+	beam.rotation = PI * 0.5
+	beam.position = Vector2(0, beam_distance * 0.5)
+	beam.scale = Vector2(max(beam_distance / 300.0, 1.0), 0.55)
+	beam.modulate = Color(0.82, 1.0, 1.25, 0.95)
+	fx_root.add_child(beam)
+
+	var tween := fx_root.create_tween()
+	tween.parallel().tween_property(fx_root, "modulate", Color(1, 1, 1, 0), 0.18)
+	tween.parallel().tween_property(orb, "scale", Vector2.ONE * 0.95, 0.18)
+	tween.parallel().tween_property(beam, "scale", Vector2(beam.scale.x * 1.08, beam.scale.y), 0.18)
+	tween.tween_callback(fx_root.queue_free)
+
+
 func _on_animation_finished() -> void:
 	if animated_sprite.animation == "death":
+		_clear_mecha_charge_warning()
 		queue_free()
 
 
@@ -200,13 +320,15 @@ func get_health_ratio() -> float:
 
 
 func is_boss_enemy() -> bool:
-	return enemy_type == "boss"
+	return enemy_type == "boss" or enemy_type == "mecha_boss"
 
 
 func get_display_name() -> String:
 	match enemy_type:
 		"boss":
 			return "War Chief"
+		"mecha_boss":
+			return "Mecha-Stone Golem"
 		"shield":
 			return "Shield Bearer"
 		"ranged":
@@ -253,7 +375,7 @@ func _update_health_bar() -> void:
 	if health_bar_root == null or health_bar_fill == null or health_bar_bg == null:
 		return
 
-	var should_show := max_health > 1 or is_elite or enemy_type == "boss" or enemy_type == "ranged" or enemy_type == "shield"
+	var should_show := max_health > 1 or is_elite or enemy_type == "boss" or enemy_type == "mecha_boss" or enemy_type == "ranged" or enemy_type == "shield"
 	health_bar_root.visible = should_show and not is_dead
 	if not should_show:
 		return
@@ -274,10 +396,76 @@ func _update_health_bar() -> void:
 func _build_animations() -> void:
 	var frames := SpriteFrames.new()
 
-	_add_grid_animation(frames, "walk", GOBLIN_SHEET, 9, 5, 0, 0, 7, 10.0, true)
-	_add_grid_animation(frames, "death", GOBLIN_SHEET, 9, 5, 4, 4, 8, 8.0, false)
+	# Goblin variant sheets are 350x320 (3x4 grid) but sprites within each cell are
+	# tiny (~25-30px) with lots of transparent padding. Need scale ~1.2 for ~30-36px visible.
+	# Goblin King 1024x704 (14x12) -> ~73x59 per frame, sprite fills more of the cell.
+	# Large Frost Goblin 256x256 single frame, sprite is ~80px within it.
+
+	match enemy_type:
+		"boss":
+			_add_grid_animation(frames, "walk", GOBLIN_KING_SHEET, 14, 12, 0, 0, 3, 8.0, true)
+			_add_grid_animation(frames, "death", GOBLIN_KING_SHEET, 14, 12, 7, 0, 7, 6.0, false)
+			animated_sprite.scale = Vector2.ONE * 0.9
+		"mecha_boss":
+			_add_grid_animation(frames, "walk", MECHA_GOLEM_SHEET, 10, 10, 6, 0, 9, 8.0, true)
+			_add_grid_animation(frames, "death", MECHA_GOLEM_SHEET, 10, 10, 7, 0, 9, 7.0, false)
+			animated_sprite.scale = Vector2.ONE * 0.92
+		"runner":
+			_add_variant_animation(frames, "walk", GOBLIN_RUNNER, 3, 4, 0, 10.0, true)
+			_add_variant_animation(frames, "death", GOBLIN_RUNNER, 3, 4, 3, 8.0, false)
+			animated_sprite.scale = Vector2.ONE * 1.2
+		"ranged":
+			_add_variant_animation(frames, "walk", GOBLIN_RANGED, 3, 4, 0, 10.0, true)
+			_add_variant_animation(frames, "death", GOBLIN_RANGED, 3, 4, 3, 8.0, false)
+			animated_sprite.scale = Vector2.ONE * 1.2
+		"shield":
+			_add_variant_animation(frames, "walk", GOBLIN_SHIELD, 3, 4, 0, 10.0, true)
+			_add_variant_animation(frames, "death", GOBLIN_SHIELD, 3, 4, 3, 8.0, false)
+			animated_sprite.scale = Vector2.ONE * 1.2
+		"armored":
+			_add_variant_animation(frames, "walk", GOBLIN_ARMORED, 3, 4, 0, 10.0, true)
+			_add_variant_animation(frames, "death", GOBLIN_ARMORED, 3, 4, 3, 8.0, false)
+			animated_sprite.scale = Vector2.ONE * 1.2
+		"tank":
+			frames.add_animation("walk")
+			frames.set_animation_speed("walk", 4.0)
+			frames.set_animation_loop("walk", true)
+			frames.add_frame("walk", LARGE_FROST_GOBLIN_0)
+			frames.add_animation("death")
+			frames.set_animation_speed("death", 6.0)
+			frames.set_animation_loop("death", false)
+			frames.add_frame("death", LARGE_FROST_GOBLIN_0)
+			animated_sprite.scale = Vector2.ONE * 0.22
+		_:
+			_add_variant_animation(frames, "walk", GOBLIN_GRUNT, 3, 4, 0, 10.0, true)
+			_add_variant_animation(frames, "death", GOBLIN_GRUNT, 3, 4, 3, 8.0, false)
+			animated_sprite.scale = Vector2.ONE * 1.2
 
 	animated_sprite.sprite_frames = frames
+
+
+func _add_variant_animation(
+	frames: SpriteFrames,
+	animation_name: String,
+	texture: Texture2D,
+	columns: int,
+	rows: int,
+	row_index: int,
+	fps: float,
+	loop: bool
+) -> void:
+	frames.add_animation(animation_name)
+	frames.set_animation_speed(animation_name, fps)
+	frames.set_animation_loop(animation_name, loop)
+
+	var frame_width := int(texture.get_width() / float(columns))
+	var frame_height := int(texture.get_height() / float(rows))
+
+	for col in range(columns):
+		var atlas := AtlasTexture.new()
+		atlas.atlas = texture
+		atlas.region = Rect2(col * frame_width, row_index * frame_height, frame_width, frame_height)
+		frames.add_frame(animation_name, atlas)
 
 
 func _add_grid_animation(

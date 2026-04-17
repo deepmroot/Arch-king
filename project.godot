@@ -11,13 +11,16 @@ config_version=5
 [application]
 
 config/name="ArchKing"
-run/main_scene="res://scenes/Level.tscn"
+run/main_scene="res://scenes/MainMenu.tscn"
 config/features=PackedStringArray("4.6", "GL Compatibility")
 config/icon="res://icon.svg"
 
+[autoload]
+
+GameState="*res://scripts/game_state.gd"
+
 [display]
 
-window/size/viewport_width=1152
 window/size/viewport_height=900
 window/stretch/mode="canvas_items"
 window/stretch/aspect="expand"

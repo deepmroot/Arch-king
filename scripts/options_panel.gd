@@ -3,6 +3,11 @@ extends Panel
 signal settings_changed(settings: Dictionary)
 signal close_requested
 
+const UI_PANEL_TEX := preload("res://assets/ui/kenney_fantasy_ui_borders/panel-transparent-border-010.png")
+const UI_BTN_NORMAL_TEX := preload("res://assets/ui/kenney_fantasy_ui_borders/panel-010.png")
+const UI_BTN_HOVER_TEX := preload("res://assets/ui/kenney_fantasy_ui_borders/panel-011.png")
+const UI_BTN_PRESSED_TEX := preload("res://assets/ui/kenney_fantasy_ui_borders/panel-012.png")
+
 @onready var display_mode_option: OptionButton = $Margin/VBox/DisplayModeOption
 @onready var resolution_scale_option: OptionButton = $Margin/VBox/ResolutionScaleOption
 @onready var master_volume_slider: HSlider = $Margin/VBox/MasterVolumeSlider
@@ -33,6 +38,63 @@ func _ready() -> void:
 	music_volume_slider.value_changed.connect(func(_value: float): _emit_settings_changed())
 	sfx_volume_slider.value_changed.connect(func(_value: float): _emit_settings_changed())
 	close_button.pressed.connect(func(): close_requested.emit())
+
+	_apply_visual_theme()
+
+
+func _make_ui_style(texture: Texture2D, tint: Color, content_margin: float = 10.0) -> StyleBoxTexture:
+	var style := StyleBoxTexture.new()
+	style.texture = texture
+	style.texture_margin_left = 12
+	style.texture_margin_top = 12
+	style.texture_margin_right = 12
+	style.texture_margin_bottom = 12
+	style.axis_stretch_horizontal = StyleBoxTexture.AXIS_STRETCH_MODE_TILE
+	style.axis_stretch_vertical = StyleBoxTexture.AXIS_STRETCH_MODE_TILE
+	style.content_margin_left = content_margin
+	style.content_margin_top = content_margin
+	style.content_margin_right = content_margin
+	style.content_margin_bottom = content_margin
+	style.modulate_color = tint
+	return style
+
+
+func _style_button_like(control: BaseButton) -> void:
+	control.add_theme_stylebox_override("normal", _make_ui_style(UI_BTN_NORMAL_TEX, Color(0.34, 0.27, 0.18, 1.0), 10.0))
+	control.add_theme_stylebox_override("hover", _make_ui_style(UI_BTN_HOVER_TEX, Color(0.44, 0.35, 0.23, 1.0), 10.0))
+	control.add_theme_stylebox_override("pressed", _make_ui_style(UI_BTN_PRESSED_TEX, Color(0.25, 0.2, 0.14, 1.0), 10.0))
+	control.add_theme_stylebox_override("focus", _make_ui_style(UI_BTN_HOVER_TEX, Color(0.44, 0.35, 0.23, 1.0), 10.0))
+	control.add_theme_color_override("font_color", Color(0.98, 0.95, 0.86, 1))
+	control.add_theme_color_override("font_hover_color", Color(1.0, 0.95, 0.75, 1))
+	control.add_theme_color_override("font_focus_color", Color(1.0, 0.95, 0.75, 1))
+	control.add_theme_color_override("font_pressed_color", Color(1.0, 0.9, 0.62, 1))
+
+
+func _apply_visual_theme() -> void:
+	add_theme_stylebox_override("panel", _make_ui_style(UI_PANEL_TEX, Color(0.82, 0.7, 0.44, 1.0), 14.0))
+
+	for control in [display_mode_option, resolution_scale_option, close_button]:
+		_style_button_like(control)
+		control.custom_minimum_size.y = 42
+
+	for slider in [master_volume_slider, music_volume_slider, sfx_volume_slider]:
+		slider.custom_minimum_size.y = 30
+		slider.modulate = Color(0.9, 0.82, 0.62, 1)
+
+	var title_label: Label = $Margin/VBox/TitleLabel
+	var hint_label: Label = $Margin/VBox/HintLabel
+	title_label.add_theme_color_override("font_color", Color(1.0, 0.88, 0.58, 1))
+	hint_label.add_theme_color_override("font_color", Color(0.92, 0.88, 0.8, 1))
+
+	for label_path in [
+		"Margin/VBox/DisplayModeLabel",
+		"Margin/VBox/ResolutionScaleLabel",
+		"Margin/VBox/MasterVolumeLabel",
+		"Margin/VBox/MusicVolumeLabel",
+		"Margin/VBox/SfxVolumeLabel"
+	]:
+		var label: Label = get_node(label_path)
+		label.add_theme_color_override("font_color", Color(0.98, 0.94, 0.86, 1))
 
 
 func apply_settings(settings: Dictionary) -> void:
